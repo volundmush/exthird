@@ -1,11 +1,55 @@
 from .exceptions import StoryDBException
 from athanor.utils import partial_match
 import typing
-from storyteller import TEMPLATES
 
 
 class Template:
-    tem_colors = {}
+    sub_types = []
+    sub_name = "Caste"
+    sheet_colors = {}
+    start_advantages = {
+        "Willpower": 5,
+        "Essence": 1
+    }
+
+    def set_sub(self, entry: str):
+        if not entry:
+            raise StoryDBException(f"Must enter a Template name!")
+        if not (found := partial_match(entry, self.sub_types)):
+            raise StoryDBException(f"No {self.sub_name} matches {entry}.")
+        self.handler.owner.db.template_subtype = found
+
+    def initialize_attributes(self):
+        c = self.handler.owner
+        for a in _ATTRIBUTES:
+            c.st_attributes.set(c, c, [a], value=1)
+
+    def initialize_abilities(self):
+        pass
+
+    def initialize_advantages(self):
+        c = self.handler.owner
+        for k, v in self.start_advantages.items():
+            c.st_advantages.set(c, c, [k], value=v)
+
+    def initialize_template(self):
+        if self.sub_types:
+            self.handler.owner.db.template_subtype = self.sub_types[0]
+
+    def initialize(self):
+        self.initialize_template()
+        self.initialize_attributes()
+        self.initialize_abilities()
+        self.initialize_advantages()
+
+    def pool_personal_max(self):
+        pass
+
+    def pool_peripheral_max(self):
+        pass
+
+    def pool_overdrive_max(self):
+        pass
 
     @classmethod
     def get_name(cls):
