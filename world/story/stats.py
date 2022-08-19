@@ -1,63 +1,68 @@
+from .base import BaseHandler, StatHandler
+from world.story import ATTRIBUTES, ABILITIES, MA_STYLES
 from world.story.exceptions import StoryDBException
-from world.utils import dramatic_capitalize
-from world.story.models import StorytellerStat
+from world.utils import dramatic_capitalize, partial_match
 
 
-class StatManager:
-    base_path = []
+class AttributeHandler(StatHandler):
+    base_path = ["Attributes"]
 
-    def __init__(self, owner):
-        self.owner = owner
+    def options(self) -> list[str]:
+        return ATTRIBUTES
 
-    def stat_row(self, path: list[str], creator=None):
-        if len(path) > 4:
-            raise StoryDBException(f"Database depth limit is 4, got {path}")
-        names = dict()
-        for i, n in enumerate(path):
-            names[f"name_{i + 1}"] = dramatic_capitalize(n)
-        stat, created = StorytellerStat.objects.get_or_create(**names)
-        if created:
-            stat.save()
-        return stat
+    def valid_value(self, name: str, value: int):
+        value = super().valid_value(name, value)
+        if value < 1:
+            raise StoryDBException("Attributes cannot be below 1!")
+        return value
 
-    def good_name(self, in_name, name_for: str = "stat", max_length: int = 80) -> str:
-        dc = dramatic_capitalize(in_name)
-        if not dc:
-            raise StoryDBException(f"Must enter a name for the {name_for}.")
-        if len(dc) > max_length:
-            raise StoryDBException(f"'{dc} is too long a name for a {name_for}.")
-        return dc
 
-    def add(self, user, path: list[str], value: int = 1):
-        pass
+class AbilityHandler(StatHandler):
+    base_path = ["Abilities"]
+    link_abil = {"Brawl": "Martial Arts",
+                 "Martial Arts": "Brawl"}
+    no_set = ("Craft", "Martial Arts")
 
-    def rem(self, user, path: list[str], value: int = 1):
-        pass
+    def options(self) -> list[str]:
+        return ABILITIES
 
-    def set(self, user, path: list[str], value: int = 1):
-        pass
+    def can_set(self, name: str, value: int):
+        if name in self.no_set:
+            raise StoryDBException(f"{name} cannot be set directly.")
 
-    def set_base(self, stat_row, value: int = 1) -> ("cstat", int):
-        try:
-            value = int(value)
-        except ValueError as err:
-            raise StoryDBException(f"Must enter a whole number 0 or greater!")
-        if value < 0:
-            raise StoryDBException(f"Must enter a whole number 0 or greater!")
-        cstat, created = self.owner.story_stats.get_or_create(stat=stat_row)
-        return cstat, value
+    def favor(self, name: str, value: int):
+        stat = self.find_stat(name)
+        value = self.valid_value(stat, value)
+        linked = self.link_abil.get(stat, None)
+        if linked and value > 0:
+            lnk_row = self.stat_row(self.base_path + [linked])
+            if found := self.owner.story_stats.filter(stat=lnk_row).first():
+                if found.stat_flag_1 > 0:
+                    raise StoryDBException(f"{linked} is already picked!")
+        row = self.stat_row(self.base_path + [stat])
+        return self.set_flag_1(row, value=value)
 
-    def set_int(self, target, stat_row, value: int = 1):
-        cstat, value = self.set_base(target, stat_row, value=value)
-        cstat.stat_value = value
-        cstat.save()
 
-    def set_flag_1(self, stat_row, value: int = 1):
-        cstat, value = self.set_base(stat_row, value=value)
-        cstat.stat_flag_1 = value
-        cstat.save()
+class StyleHandler(StatHandler):
+    base_path = ["Styles"]
 
-    def set_flag_2(self, stat_row, value: int = 1):
-        cstat, value = self.set_base(stat_row, value=value)
-        cstat.stat_flag_2 = value
-        cstat.save()
+    def options(self) -> list[str]:
+        return MA_STYLES
+
+
+class CraftHandler(BaseHandler):
+    base_path = ["Crafts"]
+
+    def set(self, name: str, value: int, creator):
+        stat = self.good_name(name, name_for="Craft")
+        value = self.valid_value(stat, value)
+        row = self.stat_row(self.base_path + [stat], creator=creator)
+        if value:
+            return self.set_int(row, value)
+        else:
+            found = self.owner.story_stats.filter(stat=row).first()
+            if found:
+                found.delete()
+            if not row.users.count():
+                row.delete()
+            return found

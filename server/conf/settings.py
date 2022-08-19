@@ -50,7 +50,8 @@ CMD_IGNORE_PREFIXES = ""
 
 SERVER_SESSION_CLASS = "server.conf.serversession.ServerSession"
 
-BASE_PLAY_TYPECLASS = "athanor.plays.plays.DefaultPlay"
+BASE_PLAY_TYPECLASS = "world.plays.plays.DefaultPlay"
+CMDSET_PLAY = "commands.cmdsets.PlayCmdSet"
 
 # The number of characters that can be logged-in per account simultaneously. Builder permissions override this.
 # Set to None for unlimited.

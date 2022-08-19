@@ -15,6 +15,7 @@ from itertools import chain
 from django.core.exceptions import ObjectDoesNotExist
 from evennia.utils.utils import make_iter, to_str, logger
 from twisted.internet.defer import inlineCallbacks, returnValue
+from world.plays.models import PlayDB
 
 
 class ObjectParent:
@@ -95,11 +96,7 @@ class ObjectParent:
         returnValue(extra)
 
     def get_play(self):
-        try:
-            if hasattr(self, "play") and not self.play.db_account:
-                return self.play
-        except ObjectDoesNotExist:
-            return None
+        return PlayDB.objects.filter(id=self).first()
 
     def get_puppeteer(self):
         try:

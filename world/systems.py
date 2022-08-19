@@ -60,7 +60,7 @@ class PlaySystem(System):
 
     def __init__(self):
         super().__init__()
-        from athanor.plays.plays import DefaultPlay
+        from world.plays.plays import DefaultPlay
         self.play = DefaultPlay
 
     async def update(self):

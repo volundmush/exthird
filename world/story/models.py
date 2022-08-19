@@ -22,3 +22,20 @@ class CharacterStat(models.Model):
 
     class Meta:
         unique_together = (("stat", "owner"),)
+
+
+class Merit(models.Model):
+    name = models.CharField(max_length=100, null=False, blank=False)
+    context = models.CharField(max_length=140, null=False, blank=True)
+
+    class Meta:
+        unique_together = (("name", "context"),)
+
+
+class CharacterMerit(models.Model):
+    owner = models.ForeignKey("objects.ObjectDB", on_delete=models.CASCADE, related_name='story_merits')
+    merit = models.ForeignKey(Merit, on_delete=models.PROTECT, related_name="holders")
+    stat_flag_1 = models.PositiveSmallIntegerField(default=0)
+
+    class Meta:
+        unique_together = (("owner", "merit"),)

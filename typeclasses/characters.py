@@ -9,7 +9,6 @@ creation commands.
 """
 from evennia.objects.objects import DefaultCharacter
 from .objects import ObjectParent
-from .mixins import MixObj
 
 
 class Character(ObjectParent, DefaultCharacter):

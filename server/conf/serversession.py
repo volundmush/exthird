@@ -200,8 +200,9 @@ class ServerSession(BaseServerSession):
             if not _PlayTC:
                 _PlayTC = class_from_module(settings.BASE_PLAY_TYPECLASS)
             existing = self.account.plays.count()
-            if existing >= settings.PLAYS_PER_ACCOUNT and not self.account.locks.check_lockstring(self.account, "perm(Builder)"):
-                raise RuntimeError(f"You have reached the maximum of {settings.PLAYS_PER_ACCOUNT} characters in play.")
+            if settings.PLAYS_PER_ACCOUNT is not None:
+                if existing >= settings.PLAYS_PER_ACCOUNT and not self.account.locks.check_lockstring(self.account, "perm(Builder)"):
+                    raise RuntimeError(f"You have reached the maximum of {settings.PLAYS_PER_ACCOUNT} characters in play.")
             new_play = _PlayTC.create(self.account, obj)
             new_play.add_session(self)
             new_play.on_first_session(self)

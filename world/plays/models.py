@@ -16,7 +16,7 @@ class PlayDB(TypedObject):
 
     __settingsclasspath__ = settings.BASE_PLAY_TYPECLASS
     __defaultclasspath__ = "world.plays.plays.DefaultPlay"
-    __applabel__ = "game"
+    __applabel__ = "plays"
 
     class Meta:
         verbose_name = "Play"

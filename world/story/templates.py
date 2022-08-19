@@ -1,5 +1,5 @@
 from .exceptions import StoryDBException
-from athanor.utils import partial_match
+from world.utils import partial_match
 import typing
 
 
