@@ -8,6 +8,13 @@ class StorytellerStat(models.Model):
     name_4 = models.CharField(max_length=80, null=False, blank=True, default='')
     creator = models.ForeignKey('objects.ObjectDB', null=True, on_delete=models.SET_NULL)
 
+    def __str__(self):
+        for x in ("name_4", "name_3", "name_2", "name_1"):
+            found = getattr(self, x, None)
+            if found:
+                return found
+        return "Unknown"
+
     class Meta:
         unique_together = (("name_1", "name_2", "name_3", "name_4"),)
 
@@ -19,6 +26,9 @@ class CharacterStat(models.Model):
     stat_extra = models.JSONField(null=True, default=None)
     stat_flag_1 = models.IntegerField(default=0)
     stat_flag_2 = models.IntegerField(default=0)
+
+    def __str__(self):
+        return str(self.stat)
 
     class Meta:
         unique_together = (("stat", "owner"),)

@@ -9,6 +9,12 @@ creation commands.
 """
 from evennia.objects.objects import DefaultCharacter
 from .objects import ObjectParent
+from evennia.utils.utils import lazy_property
+
+from world.story import stats
+from world.story.templates import TemplateHandler
+from world.story.powers import CharmHandler, SpellHandler
+from world.story.sheet import SheetHandler
 
 
 class Character(ObjectParent, DefaultCharacter):
@@ -32,4 +38,38 @@ class Character(ObjectParent, DefaultCharacter):
 
     """
 
-    pass
+    @lazy_property
+    def story_template(self):
+        return TemplateHandler(self)
+
+    @lazy_property
+    def story_advantages(self):
+        return stats.AdvantageHandler(self)
+
+    @lazy_property
+    def story_attributes(self):
+        return stats.AttributeHandler(self)
+
+    @lazy_property
+    def story_abilities(self):
+        return stats.AbilityHandler(self)
+
+    @lazy_property
+    def story_styles(self):
+        return stats.StyleHandler(self)
+
+    @lazy_property
+    def story_crafts(self):
+        return stats.CraftHandler(self)
+
+    @lazy_property
+    def story_charms(self):
+        return CharmHandler(self)
+
+    @lazy_property
+    def story_spells(self):
+        return SpellHandler(self)
+
+    @lazy_property
+    def story_sheet(self):
+        return SheetHandler(self)
