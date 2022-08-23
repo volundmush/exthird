@@ -46,6 +46,7 @@ class Template:
     def get_advantage_value(self, name: str):
         return self.handler.owner.story_advantages.get_value(name)
 
+
 class Mortal(Template):
     pass
 
@@ -63,19 +64,48 @@ class Solar(_Solaroid):
     sub_types = ["Dawn", "Zenith", "Twilight", "Night", "Eclipse"]
     sheet_colors = {"border": "bold yellow",
                     "stat_value": "bold green",
-                    "stat_name": "yellow",
-                    "stat_header": "bold red"}
+                    "stat_supernal": "bold yellow underline",
+                    "stat_favored": "yellow",
+                    "stat_caste": "bold yellow",
+                    "stat_header": "bold red",
+                    "power_subcategory": "bold yellow"
+                    }
+
 
 class Abyssal(_Solaroid):
     sub_types = ["Dusk", "Midnight", "Daybreak", "Day", "Moonshadow"]
+    sheet_colors = {"border": "bold black",
+                    "stat_value": "red",
+                    "stat_supernal": "bold red underline",
+                    "stat_favored": "red",
+                    "stat_caste": "bold red",
+                    "stat_header": "not bold magenta",
+                    "power_subcategory": "bold black"
+                    }
 
 
 class Infernal(_Solaroid):
     sub_types = ["Azimuth", "Ascendant", "Horizon", "Nadir", "Penumbra"]
+    sheet_colors = {"border": "bold green",
+                    "stat_value": "not bold cyan",
+                    "stat_supernal": "bold green underline",
+                    "stat_favored": "green",
+                    "stat_caste": "bold green",
+                    "stat_header": "bold cyan",
+                    "power_subcategory": "bold green"
+                    }
 
 
 class Lunar(Template):
     sub_types = ["Full Moon", "Changing Moon", "No Moon", "Casteless"]
+    sheet_colors = {"border": "bold cyan",
+                    "stat_value": "bold green",
+                    "stat_supernal": "bold cyan underline",
+                    "stat_favored": "cyan",
+                    "stat_caste": "bold cyan",
+                    "stat_header": "bold blue",
+                    "power_subcategory": "bold cyan"
+                    }
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 15
@@ -86,6 +116,14 @@ class Lunar(Template):
 
 class Sidereal(Template):
     sub_types = ["Journeys", "Serenity", "Battles", "Secrets", "Endings"]
+    sheet_colors = {"border": "bold magenta",
+                    "stat_value": "bold green",
+                    "stat_supernal": "bold magenta underline",
+                    "stat_favored": "not bold magenta",
+                    "stat_caste": "bold magenta",
+                    "stat_header": "bold blue",
+                    "power_subcategory": "bold magenta"
+                    }
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 2) + 9
@@ -98,6 +136,14 @@ class DragonBlooded(Template):
     name = "Dragon-Blooded"
     sub_name = 'Aspect'
     sub_types = ["Air", "Earth", "Fire", "Water", "Wood"]
+    sheet_colors = {"border": "bold red",
+                    "stat_value": "bold green",
+                    "stat_supernal": "bold red underline",
+                    "stat_favored": "not bold red",
+                    "stat_caste": "bold red",
+                    "stat_header": "bold cyan",
+                    "power_subcategory": "not bold cyan"
+                    }
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 11

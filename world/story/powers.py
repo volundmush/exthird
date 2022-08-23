@@ -71,14 +71,18 @@ class PowerNameHandler(BaseHandler):
             raise StoryDBException(f"No valid Main Category of {self.stat_type} selected!")
         return category
 
-    def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
-        main_category = self.get_main_category(main_category)
+    def get_sub_category(self, main_category: str, name: str):
         if not (categories := self.root.get(main_category, None)):
             raise StoryDBException(f"No {self.stat_type} Categories available for {main_category}.")
-        if not sub_category:
+        if not name:
             raise StoryDBException(f"No Sub-category entered!")
-        if not (sub_category := partial_match(sub_category, categories)):
+        if not (sub_category := partial_match(name, categories)):
             raise StoryDBException(f"Entered Sub-Category does not match any {self.stat_type} Categories!")
+        return sub_category
+
+    def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
+        main_category = self.get_main_category(main_category)
+        sub_category = self.get_sub_category(main_category, sub_category)
         name = self.good_name(name)
         value = self.valid_value(value)
         path = self.make_path([self.base, main_category, sub_category, name])
@@ -114,3 +118,33 @@ class SpellHandler(PowerNameHandler):
 
     def default_category(self):
         return "Sorcery"
+
+
+class EvocationHandler(PowerNameHandler):
+    stat_type = "Evocation"
+    base = "Evocations"
+
+    def get_main_category(self, category: str = None):
+        return self.good_name(category)
+
+    def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
+        main_category = self.get_main_category(sub_category)
+        name = self.good_name(name)
+        value = self.valid_value(value)
+        path = self.make_path([self.base, main_category, name])
+        stat = self.get_stat(path)
+        row, created = self.owner.story_stats.get_or_create(stat=stat)
+        row.stat_value = value
+        row.save()
+        return row
+
+    def all(self):
+        return self.owner.story_stats.filter(stat__name_1=self.base).exclude(stat__name_3='').order_by("stat__name_3")
+
+    def all_main(self):
+        out = defaultdict(list)
+        for x in self.all():
+            out[x.stat.name_2].append(x)
+        return out
+
+

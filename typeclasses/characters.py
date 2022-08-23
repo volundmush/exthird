@@ -13,7 +13,7 @@ from evennia.utils.utils import lazy_property
 
 from world.story import stats
 from world.story.templates import TemplateHandler
-from world.story.powers import CharmHandler, SpellHandler
+from world.story.powers import CharmHandler, SpellHandler, EvocationHandler
 from world.story.sheet import SheetHandler
 
 
@@ -69,6 +69,10 @@ class Character(ObjectParent, DefaultCharacter):
     @lazy_property
     def story_spells(self):
         return SpellHandler(self)
+
+    @lazy_property
+    def story_evocations(self):
+        return EvocationHandler(self)
 
     @lazy_property
     def story_sheet(self):

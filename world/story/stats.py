@@ -51,6 +51,9 @@ class _Stat:
         return self.model.stat_flag_1 == 1
 
     def is_supernal(self) -> bool:
+        return self.model.stat_flag_2 == 2
+
+    def is_caste(self) -> bool:
         return self.model.stat_flag_2 == 1
 
     def calculated_value(self):
@@ -73,6 +76,7 @@ class _Stat:
     def should_display(self) -> bool:
         return True
 
+
 class _Attribute(_Stat):
     base_path = ['Attributes']
     min_value = 1
@@ -82,7 +86,7 @@ class _Attribute(_Stat):
 ATTRIBUTES = []
 
 for x in ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Appearance", "Perception",
-              "Intelligence", "Wits"]:
+          "Intelligence", "Wits"]:
     attr = type(x, (_Attribute,), dict())
     ATTRIBUTES.append(attr)
 
@@ -100,11 +104,11 @@ class _Ability(_Stat):
 
 ABILITIES = []
 
-for x in ["Archery", "Athletics", "Awareness", "Brawl", "Bureaucracy",  "Dodge", "Integrity",
-             "Investigation", "Larceny", "Linguistics", "Lore", "Medicine", "Melee", "Occult",
-             "Performance", "Presence", "Resistance", "Ride", "Sail", "Socialize", "Stealth", "Survival", "Thrown",
-             "War"]:
-    abil = type(x, (_Ability, ), dict())
+for x in ["Archery", "Athletics", "Awareness", "Brawl", "Bureaucracy", "Dodge", "Integrity",
+          "Investigation", "Larceny", "Linguistics", "Lore", "Medicine", "Melee", "Occult",
+          "Performance", "Presence", "Resistance", "Ride", "Sail", "Socialize", "Stealth", "Survival", "Thrown",
+          "War"]:
+    abil = type(x, (_Ability,), dict())
     ABILITIES.append(abil)
 
 
@@ -115,7 +119,9 @@ class _DerivedAbility(_Ability):
         return False
 
     def calculated_value(self):
-        max_val = self.handler.owner.story_stats.filter(stat__name_1=self.check_path, stat__name_3='', stat__name_4='').exclude(stat__name_2='').aggregate(Max('stat_value'))
+        max_val = self.handler.owner.story_stats.filter(stat__name_1=self.check_path, stat__name_3='',
+                                                        stat__name_4='').exclude(stat__name_2='').aggregate(
+            Max('stat_value'))
         return max_val.get('stat_value__max', 0)
 
 
@@ -143,16 +149,15 @@ class _Style(_Stat):
 
 STYLES = []
 
-
 for x in ["Snake", "Tiger", "Single Point Shining Into the Void", "White Reaper", "Ebon Shadow", "Crane",
-             "Silver-Voiced Nightingale", "Righteous Devil", "Black Claw", "Steel Devil", "Dreaming Pearl Courtesan",
-             "Air Dragon", "Earth Dragon", "Fire Dragon", "Water Dragon", "Wood Dragon", "Golden Janissary", "Mantis",
-             "White Veil", "Centipede", "Falcon", "Laughing Monster", "Swaying Grass Dance"]:
+          "Silver-Voiced Nightingale", "Righteous Devil", "Black Claw", "Steel Devil", "Dreaming Pearl Courtesan",
+          "Air Dragon", "Earth Dragon", "Fire Dragon", "Water Dragon", "Wood Dragon", "Golden Janissary", "Mantis",
+          "White Veil", "Centipede", "Falcon", "Laughing Monster", "Swaying Grass Dance"]:
     cname = "".join(x.split())
     sdict = dict()
     if cname != x:
         sdict["name"] = x
-    style = type(cname, (_Style, ), sdict)
+    style = type(cname, (_Style,), sdict)
     STYLES.append(style)
 
 
@@ -234,6 +239,8 @@ class BaseHandler:
 
 class StatHandler(BaseHandler):
     stat_classes = []
+    base_path = []
+    base = None
 
     def load(self):
         for x in self.stat_classes:
@@ -252,12 +259,18 @@ class StatHandler(BaseHandler):
         stat = self.find_stat(name)
         return stat.calculated_value()
 
-    def set_special(self, name: str, specialty: str, value: int):
+    def set_special(self, name: str, specialty: str, value: int = 1):
         stat = self.find_stat(name)
         if not stat.can_specialize():
             raise StoryDBException(f"Cannot purchase specialties in {stat}!")
         value = self.valid_value(value)
         specialty = self.good_name(specialty)
+        stat.specialize(specialty, value=value)
+        return specialty
+
+    def all_specialties(self):
+        return self.owner.story_stats.filter(stat__name_1=self.base).exclude(stat__name_3='').order_by(
+            ['stat__name_2', 'stat__name_3'])
 
 
 class CustomHandler(BaseHandler):
