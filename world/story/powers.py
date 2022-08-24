@@ -1,29 +1,9 @@
-from world.story.models import StorytellerStat, CharacterStat
+from world.story.models import Stat, CharacterStat, Power, CharacterPower, Merit, CharacterMerit
 from world.utils import partial_match, dramatic_capitalize
 from evennia.utils.utils import lazy_property
 from world.story.exceptions import StoryDBException
-from world.story.stats import BaseHandler
+from world.story.stats import BaseHandler, ATTRIBUTES, ABILITIES, STYLES
 from collections import defaultdict
-
-
-ATTRIBUTES = ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Appearance", "Perception",
-              "Intelligence", "Wits"]
-
-ATTRIBUTES_PSM = {
-    "physical": ["Strength", "Dexterity", "Stamina"],
-    "social": ["Charisma", "Manipulation", "Appearance"],
-    "mental": ["Perception", "Intelligence", "Wits"]
-}
-
-ABILITIES = ["Archery", "Athletics", "Awareness", "Brawl", "Bureaucracy", "Craft", "Dodge", "Integrity",
-             "Investigation", "Larceny", "Linguistics", "Lore", "Martial Arts", "Medicine", "Melee", "Occult",
-             "Performance", "Presence", "Resistance", "Ride", "Sail", "Socialize", "Stealth", "Survival", "Thrown",
-             "War"]
-
-MA_STYLES = ["Snake", "Tiger", "Single Point Shining Into the Void", "White Reaper", "Ebon Shadow", "Crane",
-             "Silver-Voiced Nightingale", "Righteous Devil", "Black Claw", "Steel Devil", "Dreaming Pearl Courtesan",
-             "Air Dragon", "Earth Dragon", "Fire Dragon", "Water Dragon", "Wood Dragon", "Golden Janissary", "Mantis",
-             "White Veil", "Centipede", "Falcon", "Laughing Monster", "Swaying Grass Dance"]
 
 ESSENCE_CHARMS = ["Essence"]
 
@@ -34,7 +14,7 @@ CHARM_CATEGORIES = {
     "Abyssal": ABILITIES,
     "Lunar": ATTRIBUTES + ["Universal"],
     "Dragon-Blooded": ABILITIES,
-    "Martial Arts": MA_STYLES,
+    "Martial Arts": STYLES,
     "Sidereal": ABILITIES,
     "Liminal": ATTRIBUTES,
     "Getimian": ATTRIBUTES,
@@ -80,20 +60,27 @@ class PowerNameHandler(BaseHandler):
             raise StoryDBException(f"Entered Sub-Category does not match any {self.stat_type} Categories!")
         return sub_category
 
+    def get_power(self, main_category: str, sub_category: str, name: str):
+        power, created = Power.objects.get_or_create(root=self.base, category=main_category, sub_category=sub_category,
+                                                     name=name)
+        if created:
+            power.creator = self.owner
+            power.save()
+        return power
+
     def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
         main_category = self.get_main_category(main_category)
         sub_category = self.get_sub_category(main_category, sub_category)
         name = self.good_name(name)
         value = self.valid_value(value)
-        path = self.make_path([self.base, main_category, sub_category, name])
-        stat = self.get_stat(path)
-        row, created = self.owner.story_stats.get_or_create(stat=stat)
+        power = self.get_power(main_category, sub_category, name)
+        row, created = self.owner.db_powers.get_or_create(power=power)
         row.stat_value = value
         row.save()
         return row
 
     def all(self):
-        return self.owner.story_stats.filter(stat__name_1=self.base).exclude(stat__name_4='').order_by("stat__name_4")
+        return self.owner.db_powers.filter(power__root=self.base).order_by(["power__category", "power__sub_category", "power__name"])
 
     def all_main(self):
         out = defaultdict(lambda: defaultdict(list))
@@ -125,26 +112,50 @@ class EvocationHandler(PowerNameHandler):
     base = "Evocations"
 
     def get_main_category(self, category: str = None):
-        return self.good_name(category)
+        return "Evocations"
 
-    def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
-        main_category = self.get_main_category(sub_category)
+    def get_sub_category(self, main_category: str, name: str):
+        return self.good_name(name)
+
+
+class MeritHandler(BaseHandler):
+    root = ["General", "Artifact", "Language", "Shaping Ritual", "Mutation", "Familiar", "Social"]
+    base = 'Merits'
+
+    def default_category(self):
+        return "General"
+
+    def get_main_category(self, category: str = None):
+        if category is None:
+            category = self.default_category()
+        else:
+            category = partial_match(category, self.root)
+        if not category:
+            raise StoryDBException(f"No valid Main Category of {self.stat_type} selected!")
+        return category
+
+    def get_merit(self, main_category: str, name: str):
+        power, created = Merit.objects.get_or_create(root=self.base, category=main_category, name=name)
+        if created:
+            power.creator = self.owner
+            power.save()
+        return power
+
+    def set(self, name: str, value: int = 1, main_category: str = None):
+        main_category = self.get_main_category(main_category)
         name = self.good_name(name)
         value = self.valid_value(value)
-        path = self.make_path([self.base, main_category, name])
-        stat = self.get_stat(path)
-        row, created = self.owner.story_stats.get_or_create(stat=stat)
+        merit = self.get_merit(main_category, name)
+        row, created = self.owner.db_merits.get_or_create(merit=merit)
         row.stat_value = value
         row.save()
         return row
 
     def all(self):
-        return self.owner.story_stats.filter(stat__name_1=self.base).exclude(stat__name_3='').order_by("stat__name_3")
+        return self.owner.db_merits.all().order_by(["merit__category", "merit__name"])
 
     def all_main(self):
         out = defaultdict(list)
         for x in self.all():
             out[x.stat.name_2].append(x)
         return out
-
-

@@ -2,11 +2,11 @@ from evennia.utils.utils import lazy_property
 from django.db.models import Max
 from world.story.exceptions import StoryDBException
 from world.utils import dramatic_capitalize, partial_match
-from world.story.models import StorytellerStat
+from world.story.models import Stat, CharacterStat, CharacterSpecialty
 
 
 class _Stat:
-    base_path = []
+    category = None
     min_value = 0
     max_value = 50
     default_value = 0
@@ -19,16 +19,17 @@ class _Stat:
         return getattr(self, "name", self.__class__.__name__)
 
     @lazy_property
-    def path(self) -> dict:
-        return self.handler.make_path(self.base_path + [str(self)])
-
-    @lazy_property
     def stat(self):
-        return self.handler.get_stat(self.path)
+        stat, created = Stat.objects.get_or_create(category=self.category, name=str(self))
+        if created:
+            if self.handler.custom:
+                stat.creator = self.handler.owner
+            stat.save()
+        return stat
 
     @lazy_property
     def model(self):
-        row, created = self.handler.owner.story_stats.get_or_create(stat=self.stat)
+        row, created = self.handler.owner.db_stats.get_or_create(stat=self.stat)
         if created:
             if self.default_value is not None:
                 row.stat_value = self.default_value
@@ -78,7 +79,7 @@ class _Stat:
 
 
 class _Attribute(_Stat):
-    base_path = ['Attributes']
+    category = "Attributes"
     min_value = 1
     default_value = 1
 
@@ -92,7 +93,7 @@ for x in ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Appea
 
 
 class _Ability(_Stat):
-    base_path = ['Abilities']
+    category = "Abilities"
     stat_type = 'Ability'
 
     def can_specialize(self) -> bool:
@@ -119,10 +120,8 @@ class _DerivedAbility(_Ability):
         return False
 
     def calculated_value(self):
-        max_val = self.handler.owner.story_stats.filter(stat__name_1=self.check_path, stat__name_3='',
-                                                        stat__name_4='').exclude(stat__name_2='').aggregate(
-            Max('stat_value'))
-        return max_val.get('stat_value__max', 0)
+        max_val = self.handler.owner.db_stats.filter(stat__category=self.check_path).aggregate(Max('value'))
+        return max_val.get('value__max', 0)
 
 
 class Craft(_DerivedAbility):
@@ -141,7 +140,7 @@ ABILITIES.extend([Craft, MartialArts])
 
 class _Style(_Stat):
     stat_type = 'Style'
-    base_path = ['Styles']
+    category = 'Styles'
 
     def should_display(self) -> bool:
         return self.calculated_value()
@@ -163,7 +162,7 @@ for x in ["Snake", "Tiger", "Single Point Shining Into the Void", "White Reaper"
 
 class _Advantage(_Stat):
     stat_type = 'Advantage'
-    base_path = ['Advantages']
+    category = 'Advantages'
 
 
 class Essence(_Advantage):
@@ -218,28 +217,13 @@ class BaseHandler:
             raise StoryDBException(f"Value for {self.stat_type} must be a number!")
         return value
 
-    @classmethod
-    def make_path(cls, path: list[str]):
-        names = {f"name_{x}": '' for x in (1, 2, 3, 4)}
-        for i, n in enumerate(path):
-            names[f"name_{i + 1}"] = dramatic_capitalize(n)
-        return names
-
-    def get_stat(self, path: dict):
-        row, created = StorytellerStat.objects.get_or_create(**path)
-        if created:
-            if self.custom:
-                row.creator = self.owner
-            row.save()
-        return row
-
     def all(self):
         return sorted(list(self.data.values()), key=lambda x: str(x))
 
 
 class StatHandler(BaseHandler):
     stat_classes = []
-    base_path = []
+    category = None
     base = None
 
     def load(self):
@@ -265,12 +249,11 @@ class StatHandler(BaseHandler):
             raise StoryDBException(f"Cannot purchase specialties in {stat}!")
         value = self.valid_value(value)
         specialty = self.good_name(specialty)
-        stat.specialize(specialty, value=value)
-        return specialty
+        return stat.specialize(specialty, value=value)
 
     def all_specialties(self):
-        return self.owner.story_stats.filter(stat__name_1=self.base).exclude(stat__name_3='').order_by(
-            ['stat__name_2', 'stat__name_3'])
+        return CharacterSpecialty.objects.filter(stat__owner=self.owner, stat__stat__category=self.category).order_by(
+            ['stat__stat__category', 'stat__stat__name'])
 
 
 class CustomHandler(BaseHandler):
@@ -314,24 +297,24 @@ class CustomHandler(BaseHandler):
 
 class AttributeHandler(StatHandler):
     stat_classes = ATTRIBUTES
-    base_path = ["Attributes"]
+    category = "Attributes"
 
 
 EXISTS = {str(x) for x in [ATTRIBUTES + ABILITIES + ADVANTAGES + STYLES]}
 
 
 class AbilityHandler(StatHandler):
-    base_path = ["Abilities"]
+    category = "Abilities"
     stat_classes = ABILITIES
 
 
 class AdvantageHandler(StatHandler):
-    base_path = ['Advantages']
+    category = 'Advantages'
     stat_classes = ADVANTAGES
 
 
 class StyleHandler(StatHandler):
-    base_path = ["Styles"]
+    category = "Styles"
     stat_classes = STYLES
 
 
@@ -344,9 +327,7 @@ class _Craft(_Stat):
 
 
 class CraftHandler(CustomHandler):
-    base_path = ["Crafts"]
+    category = "Crafts"
     class_storage = dict()
     base_class = _Craft
 
-    def query(self):
-        return self.owner.story_stats.filter(stat__name_1='Crafts', stat__name_3='').exclude(stat__name_2='')

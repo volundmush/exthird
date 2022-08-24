@@ -15,6 +15,7 @@ from world.story import stats
 from world.story.templates import TemplateHandler
 from world.story.powers import CharmHandler, SpellHandler, EvocationHandler
 from world.story.sheet import SheetHandler
+from world.story.models import Template
 
 
 class Character(ObjectParent, DefaultCharacter):
@@ -37,6 +38,13 @@ class Character(ObjectParent, DefaultCharacter):
     at_post_puppet - Echoes "AccountName has entered the game" to the room.
 
     """
+
+    @lazy_property
+    def story(self):
+        template, created = Template.objects.get_or_create(id=self)
+        if created:
+            template.save()
+        return template
 
     @lazy_property
     def story_template(self):

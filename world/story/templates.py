@@ -1,5 +1,6 @@
 from .exceptions import StoryDBException
 from world.utils import partial_match
+from world.story.models import CharacterTemplate
 
 
 class Template:
@@ -218,7 +219,7 @@ class TemplateHandler:
 
     def __init__(self, owner):
         self.owner = owner
-        self.template = self.get_templates().get(self.owner.attributes.get(key="template", default="Mortal"), None)(self)
+        self.template = self.get_templates().get(self.owner.story.name)(self)
 
     def __str__(self):
         return f"<{self.__class__.__name__}: {str(self.template)}>"
@@ -233,4 +234,7 @@ class TemplateHandler:
         if not (found := partial_match(template_name, templates.keys())):
             raise StoryDBException(f"No Template matches {template_name}.")
         self.template = templates[found](self)
-        self.owner.attributes.add(key="template", value=found)
+        self.owner.story.name = found
+        self.owner.story.sub_name = None
+        self.owner.story.extra = None
+        self.owner.story.name.save()
