@@ -45,24 +45,27 @@ class _Stat:
     def can_supernal(self) -> bool:
         return True
 
+    def can_caste(self) -> bool:
+        return True
+
     def can_specialize(self) -> bool:
         return False
 
-    def is_favored(self) -> bool:
-        return self.model.stat_flag_1 == 1
+    def is_favored(self, ignore_derived=False) -> bool:
+        return self.model.flag_1 == 1
 
-    def is_supernal(self) -> bool:
-        return self.model.stat_flag_2 == 2
+    def is_supernal(self, ignore_derived=False) -> bool:
+        return self.model.flag_2 == 1
 
-    def is_caste(self) -> bool:
-        return self.model.stat_flag_2 == 1
+    def is_caste(self, ignore_derived=False) -> bool:
+        return self.model.flag_1 == 2
 
     def calculated_value(self):
-        return self.model.stat_value
+        return self.model.value
 
     def set_value(self, value: int):
-        self.model.stat_value = value
-        self.model.save(update_fields=["stat_value"])
+        self.model.value = value
+        self.model.save(update_fields=["value"])
 
     def valid_value(self, value: int):
         try:
@@ -133,6 +136,22 @@ class MartialArts(_DerivedAbility):
     name = "Martial Arts"
     check_path = 'Styles'
     stat_type = 'Martial Arts Style'
+
+    def can_favor(self) -> bool:
+        return False
+
+    def can_caste(self) -> bool:
+        return False
+
+    def is_favored(self, ignore_derived=False) -> bool:
+        if ignore_derived:
+            return super().is_favored(ignore_derived=ignore_derived)
+        return self.handler.data["Brawl"].is_favored(ignore_derived=ignore_derived)
+
+    def is_caste(self, ignore_derived=False) -> bool:
+        if ignore_derived:
+            return super().is_favored(ignore_derived=ignore_derived)
+        return self.handler.data["Brawl"].is_caste(ignore_derived=ignore_derived)
 
 
 ABILITIES.extend([Craft, MartialArts])
@@ -253,8 +272,13 @@ class StatHandler(BaseHandler):
 
     def all_specialties(self):
         return CharacterSpecialty.objects.filter(stat__owner=self.owner, stat__stat__category=self.category).order_by(
-            ['stat__stat__category', 'stat__stat__name'])
+            'stat__stat__category', 'stat__stat__name')
 
+    def reset_sub(self):
+        for stat in self.data.values():
+            stat.flag_1 = 0
+            stat.flag_2 = 0
+            stat.save(update_fields=["flag_1", "flag_2"])
 
 class CustomHandler(BaseHandler):
     base_class = None

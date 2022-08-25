@@ -2,7 +2,8 @@ from django.db import models
 
 
 class CharacterTemplate(models.Model):
-    id = models.OneToOneField('objects.ObjectDB', null=False, related_name='storyteller', on_delete=models.CASCADE)
+    id = models.OneToOneField('objects.ObjectDB', null=False, related_name='storyteller', primary_key=True,
+                              on_delete=models.CASCADE)
     name = models.CharField(max_length=15, null=False, blank=False, default='Mortal')
     sub_name = models.CharField(max_length=15, null=True, blank=False)
     extra = models.JSONField(null=True, default=None)
@@ -19,7 +20,7 @@ class Stat(models.Model):
 
 class CharacterStat(models.Model):
     stat = models.ForeignKey(Stat, on_delete=models.PROTECT, related_name="users")
-    owner = models.ForeignKey("objects.ObjectDB", on_delete=models.CASCADE, related_name="story_stats")
+    owner = models.ForeignKey("objects.ObjectDB", on_delete=models.CASCADE, related_name="db_stats")
     value = models.PositiveIntegerField(default=0, null=False)
     extra = models.JSONField(null=True, default=None)
     flag_1 = models.IntegerField(default=0)

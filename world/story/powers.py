@@ -61,7 +61,7 @@ class PowerNameHandler(BaseHandler):
         return sub_category
 
     def get_power(self, main_category: str, sub_category: str, name: str):
-        power, created = Power.objects.get_or_create(root=self.base, category=main_category, sub_category=sub_category,
+        power, created = Power.objects.get_or_create(root=self.base, category=main_category, subcategory=sub_category,
                                                      name=name)
         if created:
             power.creator = self.owner
@@ -80,7 +80,7 @@ class PowerNameHandler(BaseHandler):
         return row
 
     def all(self):
-        return self.owner.db_powers.filter(power__root=self.base).order_by(["power__category", "power__sub_category", "power__name"])
+        return self.owner.db_powers.filter(power__root=self.base).order_by("power__category", "power__subcategory", "power__name")
 
     def all_main(self):
         out = defaultdict(lambda: defaultdict(list))

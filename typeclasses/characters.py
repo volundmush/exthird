@@ -3,7 +3,7 @@ Characters
 
 Characters are (by default) Objects setup to be puppeted by Accounts.
 They are what you "see" in game. The Character class in this module
-is setup to be the "default" character type created by the default
+is set up to be the "default" character type created by the default
 creation commands.
 
 """
@@ -15,7 +15,7 @@ from world.story import stats
 from world.story.templates import TemplateHandler
 from world.story.powers import CharmHandler, SpellHandler, EvocationHandler
 from world.story.sheet import SheetHandler
-from world.story.models import Template
+from world.story.models import CharacterTemplate
 
 
 class Character(ObjectParent, DefaultCharacter):
@@ -41,7 +41,7 @@ class Character(ObjectParent, DefaultCharacter):
 
     @lazy_property
     def story(self):
-        template, created = Template.objects.get_or_create(id=self)
+        template, created = CharacterTemplate.objects.get_or_create(id=self)
         if created:
             template.save()
         return template
