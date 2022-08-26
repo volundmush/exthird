@@ -1,14 +1,6 @@
 from django.db import models
 
 
-class CharacterTemplate(models.Model):
-    id = models.OneToOneField('objects.ObjectDB', null=False, related_name='storyteller', primary_key=True,
-                              on_delete=models.CASCADE)
-    name = models.CharField(max_length=15, null=False, blank=False, default='Mortal')
-    sub_name = models.CharField(max_length=15, null=True, blank=False)
-    extra = models.JSONField(null=True, default=None)
-
-
 class Stat(models.Model):
     category = models.CharField(max_length=20, null=False, blank=False)
     name = models.CharField(max_length=80, null=False, blank=False)

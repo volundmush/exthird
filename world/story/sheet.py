@@ -18,7 +18,7 @@ class SheetHandler:
 
     def colors(self):
         colors = dict(self.base_colors)
-        colors.update(self.owner.story_template.template.sheet_colors)
+        colors.update(self.owner.sheet_colors)
         return colors
 
     def render_stat(self, stat, colors=None):

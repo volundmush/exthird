@@ -1,55 +1,39 @@
 from .exceptions import StoryDBException
 from world.utils import partial_match
-from world.story.models import CharacterTemplate
+from typeclasses.characters import Character
 
 
-class Template:
-    sub_types = []
+class Template(Character):
+    kind = None
+    sub_abilities = []
+    sub_attributes = []
+    caste_attributes = 0
+    favored_attributes = 0
+    supernal_attributes = 0
+    caste_abilities = 0
+    favored_abilities = 0
+    supernal_abilities = 0
+    specialties = 4
     sub_name = "Caste"
     sheet_colors = {}
     start_advantages = {
         "Willpower": 5,
         "Essence": 1
     }
-    sub_abilities = {}
-    sub_attributes = {}
     extra_fields = {}
-    default_sub = None
     supernal_name = None
 
-    def caste_attributes_available(self) -> int:
-        return 0
+    def at_object_creation(self):
+        super().at_object_creation()
+        self.story_reset()
 
-    def caste_abilities_available(self) -> int:
-        return 0
-
-    def favored_attributes_available(self) -> int:
-        return 0
-
-    def favored_abilities_available(self) -> int:
-        return 0
-
-    def supernal_attributes_available(self) -> int:
-        return 0
-
-    def supernal_abilities_available(self) -> int:
-        return 0
-
-    def set_sub(self, entry: str):
-        if not entry:
-            raise StoryDBException(f"Must enter a Template name!")
-        if not (found := partial_match(entry, self.sub_types)):
-            raise StoryDBException(f"No {self.sub_name} matches {entry}.")
-        current_sub = self.handler.owner.story.sub_name
-        self.handler.owner.story.sub_name = found
-        self.handler.owner.story.save(update_fields=["sub_name"])
-
-        if current_sub != found:
-            self.reset_sub()
-
-    def reset_sub(self):
-        self.owner.story_attributes.reset_sub()
-        self.owner.story_abilities.reset_sub()
+    def story_reset(self):
+        for k, v in self.start_advantages.items():
+            if (stat := self.story_advantages.data[k]):
+                if stat.calculated_value() < v:
+                    stat.set_value(v)
+        self.story_attributes.reset_sub()
+        self.story_abilities.reset_sub()
 
     def pool_personal_max(self):
         pass
@@ -57,34 +41,51 @@ class Template:
     def pool_peripheral_max(self):
         pass
 
-    @classmethod
-    def get_name(cls):
-        return getattr(cls, "name", cls.__name__)
-
-    def __str__(self):
-        return getattr(self, "name", self.__class__.__name__)
-
-    def __repr__(self):
-        return '<Template: %s>' % str(self)
-
-    def __init__(self, handler):
-        self.handler = handler
-
-    def initialize(self):
-        pass
-
     def native_charm_category(self):
-        return str(self)
+        return self.kind
 
     def get_advantage_value(self, name: str):
-        return self.handler.owner.story_advantages.get_value(name)
+        return self.story_advantages.get_value(name)
+
+    def change_type(self, name: str):
+        from world.story.templates import find_template, TEMPLATES
+        found = find_template(name)
+        self.swap_typeclass(new_typeclass=found)
+
+class _Mortal(Template):
+    kind = "Mortal"
+    sub_name = "Archetype"
+    extra_fields = {"Profession": None}
+    start_advantages = {
+        "Willpower": 3,
+        "Essence": 1
+    }
 
 
-class Mortal(Template):
+class Warrior(_Mortal):
+    pass
+
+
+class Priest(_Mortal):
+    pass
+
+
+class Savant(_Mortal):
+    pass
+
+
+class Criminal(_Mortal):
+    pass
+
+
+class Broker(_Mortal):
     pass
 
 
 class _Solaroid(Template):
+    favored_abilities = 5
+    caste_abilities = 5
+    supernal_abilities = 1
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 3) + 10
@@ -92,26 +93,29 @@ class _Solaroid(Template):
     def pool_peripheral_max(self):
         return (self.get_advantage_value("Essence") * 7) + 26
 
-    def favored_abilities_available(self) -> int:
-        return 5
 
-    def caste_abilities_available(self) -> int:
-        return 5
-
-    def supernal_abilities_available(self) -> int:
-        return 1
+class _Dawnoid(_Solaroid):
+    sub_abilities = ["Archery", "Awareness", "Brawl", "Dodge", "Melee", "Resistance", "Thrown", "War"]
 
 
-_DAWN = ["Archery", "Awareness", "Brawl", "Dodge", "Melee", "Resistance", "Thrown", "War"]
-_ZENITH = ["Athletics", "Integrity", "Performance", "Lore", "Presence", "Resistance", "Survival", "War"]
-_TWILIGHT = ["Bureaucracy", "Craft", "Integrity", "Investigation", "Linguistics", "Lore", "Medicine", "Occult"]
-_NIGHT = ["Athletics", "Awareness", "Dodge", "Investigation", "Larceny", "Ride", "Stealth", "Socialize"]
-_ECLIPSE = ["Bureaucracy", "Larceny", "Linguistics", "Occult", "Presence", "Ride", "Sail", "Socialize"]
+class _Zenithoid(_Solaroid):
+    sub_abilities = ["Athletics", "Integrity", "Performance", "Lore", "Presence", "Resistance", "Survival", "War"]
 
 
-class Solar(_Solaroid):
-    sub_types = ["Dawn", "Zenith", "Twilight", "Night", "Eclipse"]
-    default_sub = "Dawn"
+class _Twilightoid(_Solaroid):
+    sub_abilities = ["Bureaucracy", "Craft", "Integrity", "Investigation", "Linguistics", "Lore", "Medicine", "Occult"]
+
+
+class _Nightoid(_Solaroid):
+    sub_abilities = ["Athletics", "Awareness", "Dodge", "Investigation", "Larceny", "Ride", "Stealth", "Socialize"]
+
+
+class _Eclipsoid(_Solaroid):
+    sub_abilities = ["Bureaucracy", "Larceny", "Linguistics", "Occult", "Presence", "Ride", "Sail", "Socialize"]
+
+
+class _Solar(Template):
+    kind = "Solar"
     sheet_colors = {"border": "bold yellow",
                     "stat_value": "bold green",
                     "stat_supernal": "bold yellow underline",
@@ -120,19 +124,31 @@ class Solar(_Solaroid):
                     "stat_header": "bold red",
                     "power_subcategory": "bold yellow"
                     }
-    sub_abilities = {
-        "Dawn": _DAWN,
-        "Zenith": _ZENITH,
-        "Twilight": _TWILIGHT,
-        "Night": _NIGHT,
-        "Eclipse": _ECLIPSE
-    }
     supernal_name = "Supernal"
 
 
-class Abyssal(_Solaroid):
-    sub_types = ["Dusk", "Midnight", "Daybreak", "Day", "Moonshadow"]
-    default_sub = "Dusk"
+class Dawn(_Dawnoid, _Solar):
+    pass
+
+
+class Zenith(_Zenithoid, _Solar):
+    pass
+
+
+class Twilight(_Twilightoid, _Solar):
+    pass
+
+
+class Night(_Nightoid, _Solar):
+    pass
+
+
+class Eclipse(_Eclipsoid, _Solar):
+    pass
+
+
+class _Abyssal(Template):
+    kind = "Abyssal"
     sheet_colors = {"border": "bold black",
                     "stat_value": "red",
                     "stat_supernal": "bold red underline",
@@ -141,17 +157,31 @@ class Abyssal(_Solaroid):
                     "stat_header": "not bold magenta",
                     "power_subcategory": "bold black"
                     }
-    sub_abilities = {
-        "Dusk": _DAWN,
-        "Midnight": _ZENITH,
-        "Daybreak": _TWILIGHT,
-        "Day": _NIGHT,
-        "Moonshadow": _ECLIPSE
-    }
     supernal_name = "Chthonic"
 
 
-class Infernal(_Solaroid):
+class Dusk(_Dawnoid, _Abyssal):
+    pass
+
+
+class Midnight(_Zenithoid, _Abyssal):
+    pass
+
+
+class Daybreak(_Twilightoid, _Abyssal):
+    pass
+
+
+class Day(_Nightoid, _Abyssal):
+    pass
+
+
+class Moonshadow(_Eclipsoid, _Abyssal):
+    pass
+
+
+class _Infernal(Template):
+    kind = "Infernal"
     sub_types = ["Azimuth", "Ascendant", "Horizon", "Nadir", "Penumbra"]
     default_sub = "Azimuth"
     sheet_colors = {"border": "bold green",
@@ -164,9 +194,29 @@ class Infernal(_Solaroid):
                     }
 
 
-class Lunar(Template):
-    sub_types = ["Full Moon", "Changing Moon", "No Moon", "Casteless"]
-    default_sub = "Casteless"
+class Azimuth(_Dawnoid, _Infernal):
+    pass
+
+
+class Ascendant(_Zenithoid, _Infernal):
+    pass
+
+
+class Horizon(_Twilightoid, _Infernal):
+    pass
+
+
+class Nadir(_Nightoid, _Infernal):
+    pass
+
+
+class Penumbra(_Eclipsoid, _Infernal):
+    pass
+
+
+class _Lunar(Template):
+    kind = "Lunar"
+    favored_attributes = 2
     sheet_colors = {"border": "bold cyan",
                     "stat_value": "bold green",
                     "stat_supernal": "bold cyan underline",
@@ -175,11 +225,9 @@ class Lunar(Template):
                     "stat_header": "bold blue",
                     "power_subcategory": "bold cyan"
                     }
-    sub_attributes = {
-        "Full Moon": ["Dexterity", "Stamina", "Strength"],
-        "Changing Moon": ["Appearance", "Charisma", "Manipulation"],
-        "No Moon": ["Intelligence", "Perception", "Wits"]
-    }
+
+    extra_fields = {"Spirit Shape": True,
+                    "Tell": True}
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 15
@@ -187,17 +235,32 @@ class Lunar(Template):
     def pool_peripheral_max(self):
         return (self.get_advantage_value("Essence") * 4) + 34
 
-    def favored_attributes_available(self) -> int:
-        return 2
 
-    def caste_attributes_available(self) -> int:
-        if self.handler.owner.story.sub_name != "Casteless":
-            return 2
-        return 0
+class Casteless(_Lunar):
+    pass
 
 
-class Sidereal(Template):
-    sub_types = ["Journeys", "Serenity", "Battles", "Secrets", "Endings"]
+class _Tattooed(_Lunar):
+    caste_attributes = 2
+
+
+class FullMoon(_Tattooed):
+    type_name = "Full Moon"
+    sub_attributes = ["Dexterity", "Stamina", "Strength"]
+
+
+class ChangingMoon(_Tattooed):
+    type_name = "Changing Moon"
+    sub_attributes = ["Appearance", "Charisma", "Manipulation"]
+
+
+class NoMoon(_Tattooed):
+    type_name = "No Moon"
+    sub_attributes = ["Intelligence", "Perception", "Wits"]
+
+
+class _Sidereal(Template):
+    kind = "Sidereal"
     sheet_colors = {"border": "bold magenta",
                     "stat_value": "bold green",
                     "stat_supernal": "bold magenta underline",
@@ -214,11 +277,30 @@ class Sidereal(Template):
         return (self.get_advantage_value("Essence") * 6) + 25
 
 
-class DragonBlooded(Template):
-    name = "Dragon-Blooded"
-    sub_name = 'Aspect'
-    sub_types = ["Air", "Earth", "Fire", "Water", "Wood"]
-    default_sub = "Air"
+class Journeys(_Sidereal):
+    pass
+
+
+class Battles(_Sidereal):
+    pass
+
+
+class Endings(_Sidereal):
+    pass
+
+
+class Secrets(_Sidereal):
+    pass
+
+
+class Serenity(_Sidereal):
+    pass
+
+
+class _DragonBlood(Template):
+    kind = "Dragon-Blooded"
+    favored_abilities = 5
+    sub_name = "Aspect"
     sheet_colors = {"border": "bold red",
                     "stat_value": "bold green",
                     "stat_supernal": "bold red underline",
@@ -227,16 +309,6 @@ class DragonBlooded(Template):
                     "stat_header": "bold cyan",
                     "power_subcategory": "not bold cyan"
                     }
-    sub_abilities = {
-        "Air": ["Linguistics", "Lore", "Occult", "Stealth", "Thrown"],
-        "Earth": ["Awareness", "Craft", "Integrity", "Resistance", "War"],
-        "Fire": ["Athletics", "Dodge", "Melee", "Presence", "Socialize"],
-        "Water": ["Brawl", "Bureaucracy", "Investigation", "Larceny", "Sail"],
-        "Wood": ["Archery", "Medicine", "Performance", "Ride", "Survival"]
-    }
-
-    def favored_abilities_available(self) -> int:
-        return 5
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 11
@@ -244,23 +316,84 @@ class DragonBlooded(Template):
     def pool_peripheral_max(self):
         return (self.get_advantage_value("Essence") * 4) + 23
 
-    def reset_sub(self):
-        super().reset_sub()
-        for abil in self.sub_abilities.get(self.handler.owner.story.sub_name, list()):
-            if (ab := self.handler.owner.story_abilities.data.get(abil, None)):
-                ab.flag_1 = 2
-                ab.save(update_fields=["flag_1"])
+    def at_object_creation(self):
+        super().at_object_creation()
+        for abil in self.sub_abilities:
+            if (ab := self.story_abilities.data.get(abil, None)):
+                ab.model.flag_1 = 2
+                ab.model.save(update_fields=["flag_1"])
 
 
-class Alchemical(Template):
-    sub_types = ['Adamant', 'Jade', 'Moonsilver', 'Orichalcum', 'Starmetal', 'Soulsteel']
+class Air(_DragonBlood):
+    sub_abilities = ["Linguistics", "Lore", "Occult", "Stealth", "Thrown"]
 
 
-class Getimian(Template):
-    sub_types = ["Spring", "Summer", "Autumn", "Winter"]
+class Earth(_DragonBlood):
+    sub_abilities = ["Awareness", "Craft", "Integrity", "Resistance", "War"]
 
 
-class Liminal(Template):
+class Fire(_DragonBlood):
+    sub_abilities = ["Athletics", "Dodge", "Melee", "Presence", "Socialize"]
+
+
+class Water(_DragonBlood):
+    sub_abilities = ["Brawl", "Bureaucracy", "Investigation", "Larceny", "Sail"]
+
+
+class Wood(_DragonBlood):
+    sub_abilities = ["Archery", "Medicine", "Performance", "Ride", "Survival"]
+
+
+class _Alchemical(Template):
+    kind = "Alchemical"
+
+
+class Adamant(_Alchemical):
+    pass
+
+
+class Jade(_Alchemical):
+    pass
+
+
+class Moonsilver(_Alchemical):
+    pass
+
+
+class Orichalcum(_Alchemical):
+    pass
+
+
+class Starmetal(_Alchemical):
+    pass
+
+
+class Soulsteel(_Alchemical):
+    pass
+
+
+class _Getimian(Template):
+    kind = "Getimian"
+
+
+class Spring(_Getimian):
+    pass
+
+
+class Summer(_Getimian):
+    pass
+
+
+class Autumn(_Getimian):
+    pass
+
+
+class Winter(_Getimian):
+    pass
+
+
+class _Liminal(Template):
+    kind = "Liminal"
     sub_types = ["Blood", "Breath", "Flesh", "Marrow", "Soil"]
 
     def pool_personal_max(self):
@@ -270,7 +403,27 @@ class Liminal(Template):
         return (self.get_advantage_value("Essence") * 4) + 23
 
 
-class _Celestial(Template):
+class Blood(_Liminal):
+    pass
+
+
+class Breath(_Liminal):
+    pass
+
+
+class Flesh(_Liminal):
+    pass
+
+
+class Marrow(_Liminal):
+    pass
+
+
+class Soil(_Liminal):
+    pass
+
+
+class _CelestialPools(Template):
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 2) + 11
@@ -279,11 +432,7 @@ class _Celestial(Template):
         return (self.get_advantage_value("Essence") * 6) + 27
 
 
-class CelestialExigent(_Celestial):
-    name = "Celestial Exigent"
-
-
-class _Terrestrial(Template):
+class _TerrestrialPools(Template):
 
     def pool_personal_max(self):
         return self.get_advantage_value("Essence") + 11
@@ -292,51 +441,68 @@ class _Terrestrial(Template):
         return (self.get_advantage_value("Essence") * 4) + 23
 
 
-class TerrestrialExigent(_Terrestrial):
-    name = "Terrestrial Exigent"
+class _Exigent(Template):
+    kind = "Exigent"
 
 
-class DreamSouled(_Terrestrial):
-    name = "Dream-Souled"
-
-
-class Hearteater(_Celestial):
+class Terrestrial(_TerrestrialPools, _Exigent):
     pass
 
 
-class Umbral(_Celestial):
+class Celestial(_CelestialPools, _Exigent):
     pass
 
 
-#TEMPLATES = [Mortal, Solar, Abyssal, Infernal, Lunar, Sidereal, DragonBlooded, Alchemical, Getimian, Liminal,
-#             CelestialExigent, TerrestrialExigent, DreamSouled, Hearteater, Umbral]
-
-TEMPLATES = [Mortal, Solar, Lunar, DragonBlooded, CelestialExigent, TerrestrialExigent, DreamSouled, Hearteater, Umbral]
-
-TEMPLATES_DICT = {x.get_name(): x for x in TEMPLATES}
+class DreamSouled(_TerrestrialPools):
+    kind = "Dream-Souled"
+    sub_name = "Tier"
+    type_name = "Dream-Souled"
 
 
-class TemplateHandler:
+class Hearteater(_CelestialPools):
+    kind = "Hearteater"
+    sub_name = "Tier"
 
-    def __init__(self, owner):
-        self.owner = owner
-        self.template = self.get_templates().get(self.owner.story.name)(self)
 
-    def __str__(self):
-        return f"<{self.__class__.__name__}: {str(self.template)}>"
+class Umbral(_CelestialPools):
+    kind = "Umbral"
+    sub_name = "Tier"
 
-    def get_templates(self):
-        return TEMPLATES_DICT
 
-    def set(self, template_name: str):
-        templates = self.get_templates()
-        if not template_name:
-            raise StoryDBException(f"Must enter a Template name!")
-        if not (found := partial_match(template_name, templates.keys())):
-            raise StoryDBException(f"No Template matches {template_name}.")
-        self.template = templates[found](self)
-        self.owner.story.name = found
-        self.owner.story.sub_name = self.template.default_sub
-        self.owner.story.extra = None
-        self.owner.story.save()
-        self.template.reset_sub()
+TEMPLATES = {
+    "Mortal": [Warrior, Priest, Savant, Criminal, Broker],
+    "Solar": [Dawn, Zenith, Twilight, Night, Eclipse],
+    "Abyssal": [Dusk, Midnight, Daybreak, Day, Moonshadow],
+    "Infernal": [Azimuth, Ascendant, Horizon, Nadir, Penumbra],
+    "Lunar": [Casteless, FullMoon, ChangingMoon, NoMoon],
+    "Sidereal": [Journeys, Battles, Endings, Secrets, Serenity],
+    "Dragon-Blooded": [Air, Earth, Fire, Water, Wood],
+    "Alchemical": [Adamant, Orichalcum, Moonsilver, Jade, Starmetal, Soulsteel],
+    "Getimian": [Spring, Summer, Autumn, Winter],
+    "Liminal": [Blood, Breath, Flesh, Marrow, Soil],
+    "Exigent": [Terrestrial, Celestial],
+    "Dream-Souled": DreamSouled,
+    "Hearteater": Hearteater,
+    "Umbral": Umbral
+}
+
+
+def find_template(name: str):
+    if not name:
+        raise StoryDBException("Must enter a Template name!")
+    words = name.split("/")
+    if not (template_name := partial_match(words[0], TEMPLATES.keys())):
+        raise StoryDBException(f"Template '{words[0]}' not found. Choices are: {', '.join(TEMPLATES.keys())}")
+    choices = TEMPLATES[template_name]
+
+    # just return the first match if the value isn't a list.
+    if not isinstance(choices, list):
+        return choices
+
+    if len(words) < 2:
+        raise StoryDBException(f"Template '{words[0]}' not found. Choices are: {', '.join([getattr(x, 'type_name', x.__name__) for x in choices])}")
+
+    if not (found := partial_match(words[1], choices, key=lambda x: getattr(x, 'type_name', x.__name__))):
+        raise StoryDBException(
+            f"Template '{words[0]}' not found. Choices are: {', '.join([getattr(x, 'type_name', x.__name__) for x in choices])}")
+    return found

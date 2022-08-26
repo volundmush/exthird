@@ -5,7 +5,13 @@ from world.utils import dramatic_capitalize, partial_match
 from world.story.models import Stat, CharacterStat, CharacterSpecialty
 
 
-class _Stat:
+class MetaStat(type):
+
+    def __str__(cls):
+        return getattr(cls, "name", cls.__name__)
+
+
+class _Stat(metaclass=MetaStat):
     category = None
     min_value = 0
     max_value = 50
@@ -86,8 +92,12 @@ class _Attribute(_Stat):
     min_value = 1
     default_value = 1
 
+    def should_display(self) -> bool:
+        return self.calculated_value() or self.is_caste() or self.is_favored() or self.is_supernal()
+
 
 ATTRIBUTES = []
+
 
 for x in ["Strength", "Dexterity", "Stamina", "Charisma", "Manipulation", "Appearance", "Perception",
           "Intelligence", "Wits"]:
@@ -103,7 +113,7 @@ class _Ability(_Stat):
         return True
 
     def should_display(self) -> bool:
-        return self.calculated_value() or self.is_favored() or self.is_supernal()
+        return self.calculated_value() or self.is_caste() or self.is_favored() or self.is_supernal()
 
 
 ABILITIES = []
@@ -221,7 +231,7 @@ class BaseHandler:
     def options(self):
         return self.data.values()
 
-    def find_stat(self, name: str) -> str:
+    def find_stat(self, name: str) -> _Stat:
         if not name:
             raise StoryDBException(f"Must enter a {self.stat_type} name!")
         ops = self.options()
@@ -242,6 +252,7 @@ class BaseHandler:
 
 class StatHandler(BaseHandler):
     stat_classes = []
+    stat_type = None
     category = None
     base = None
 
@@ -270,15 +281,81 @@ class StatHandler(BaseHandler):
         specialty = self.good_name(specialty)
         return stat.specialize(specialty, value=value)
 
+    def get_caste_count(self):
+        return 0
+
+    def get_favor_count(self):
+        return 0
+
+    def get_supernal_count(self):
+        return 0
+
+    def set_favored(self, name: str, value: bool = True):
+        stat = self.find_stat(name)
+        if not stat.can_favor():
+            raise StoryDBException(f"{stat} cannot be a Favored {self.stat_type}!")
+        if value:
+            count = len([x for x in self.data.values() if x.is_favored(ignore_derived=True)])
+            if count >= self.get_favor_count():
+                raise StoryDBException(f"Cannot set another Favored {self.stat_type}!")
+            if stat.is_favored(ignore_derived=True):
+                raise StoryDBException(f"{stat} is already a Favored {self.stat_type}!")
+            if stat.is_caste(ignore_derived=True):
+                raise StoryDBException(f"{stat} has been picked as a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+        else:
+            if not stat.is_favored(ignore_derived=True):
+                raise StoryDBException(f"{stat} is not a Favored {self.stat_type}!")
+        stat.model.flag_1 = 1 if value else 0
+        stat.model.save(update_fields=["flag_1"])
+
+    def set_caste(self, name: str, value: bool = True):
+        stat = self.find_stat(name)
+        if not stat.can_caste():
+            raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+        if value:
+            count = len([x for x in self.data.values() if x.is_caste(ignore_derived=True)])
+            if count >= self.get_caste_count():
+                raise StoryDBException(
+                    f"Cannot set another {self.owner.story_template.template.sub_name} {self.stat_type}!")
+            if stat.is_caste(ignore_derived=True):
+                raise StoryDBException(f"{stat} is already a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+            if stat.is_favored(ignore_derived=True):
+                raise StoryDBException(f"{stat} has been picked as a Favored {self.stat_type}!")
+        else:
+            if not stat.is_caste(ignore_derived=True):
+                raise StoryDBException(f"{stat} is not a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+        stat.model.flag_1 = 2 if value else 0
+        stat.model.save(update_fields=["flag_1"])
+
+    def set_supernal(self, name: str, value: bool = True):
+        stat = self.find_stat(name)
+        if not stat.can_supernal():
+            raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+        if value:
+            count = len([x for x in self.data.values() if x.is_supernal(ignore_derived=True)])
+            if count >= self.get_supernal_count() and value:
+                raise StoryDBException(
+                    f"Cannot set another {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+            if not stat.is_caste():
+                raise StoryDBException(
+                    f"{stat} must first become a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+        else:
+            if not stat.is_supernal(ignore_derived=True):
+                raise StoryDBException(
+                    f"{stat} is already a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+        stat.model.flag_2 = 1 if value else 0
+        stat.model.save(update_fields=["flag_1"])
+
     def all_specialties(self):
         return CharacterSpecialty.objects.filter(stat__owner=self.owner, stat__stat__category=self.category).order_by(
             'stat__stat__category', 'stat__stat__name')
 
     def reset_sub(self):
         for stat in self.data.values():
-            stat.flag_1 = 0
-            stat.flag_2 = 0
-            stat.save(update_fields=["flag_1", "flag_2"])
+            stat.model.flag_1 = 0
+            stat.model.flag_2 = 0
+            stat.model.save(update_fields=["flag_1", "flag_2"])
+
 
 class CustomHandler(BaseHandler):
     base_class = None
