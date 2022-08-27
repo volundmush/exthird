@@ -38,7 +38,7 @@ class _Stat(metaclass=MetaStat):
         row, created = self.handler.owner.db_stats.get_or_create(stat=self.stat)
         if created:
             if self.default_value is not None:
-                row.stat_value = self.default_value
+                row.value = self.default_value
             row.save()
         return row
 
@@ -267,7 +267,7 @@ class StatHandler(BaseHandler):
         if not stat.can_set():
             raise StoryDBException(f"{stat} cannot be set directly.")
         stat.set_value(value)
-        return stat
+        return stat, value
 
     def get_value(self, name: str) -> int:
         stat = self.find_stat(name)
@@ -290,10 +290,13 @@ class StatHandler(BaseHandler):
     def get_supernal_count(self):
         return 0
 
-    def set_favored(self, name: str, value: bool = True):
-        stat = self.find_stat(name)
+    def set_favored(self, stat: str, value: bool = True, toggle: bool = False):
+        if not isinstance(stat, _Stat):
+            stat = self.find_stat(stat)
         if not stat.can_favor():
             raise StoryDBException(f"{stat} cannot be a Favored {self.stat_type}!")
+        if toggle:
+            value = not stat.is_favored(ignore_derived=True)
         if value:
             count = len([x for x in self.data.values() if x.is_favored(ignore_derived=True)])
             if count >= self.get_favor_count():
@@ -307,11 +310,15 @@ class StatHandler(BaseHandler):
                 raise StoryDBException(f"{stat} is not a Favored {self.stat_type}!")
         stat.model.flag_1 = 1 if value else 0
         stat.model.save(update_fields=["flag_1"])
+        return stat, value
 
-    def set_caste(self, name: str, value: bool = True):
-        stat = self.find_stat(name)
+    def set_caste(self, stat: str, value: bool = True, toggle: bool = False):
+        if not isinstance(stat, _Stat):
+            stat = self.find_stat(stat)
         if not stat.can_caste():
             raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+        if toggle:
+            value = not stat.is_caste(ignore_derived=True)
         if value:
             count = len([x for x in self.data.values() if x.is_caste(ignore_derived=True)])
             if count >= self.get_caste_count():
@@ -326,11 +333,15 @@ class StatHandler(BaseHandler):
                 raise StoryDBException(f"{stat} is not a {self.owner.story_template.template.sub_name} {self.stat_type}!")
         stat.model.flag_1 = 2 if value else 0
         stat.model.save(update_fields=["flag_1"])
+        return stat, value
 
-    def set_supernal(self, name: str, value: bool = True):
-        stat = self.find_stat(name)
+    def set_supernal(self, stat: str, value: bool = True, toggle: bool = False):
+        if not isinstance(stat, _Stat):
+            stat = self.find_stat(stat)
         if not stat.can_supernal():
             raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+        if toggle:
+            value = not stat.is_supernal(ignore_derived=True)
         if value:
             count = len([x for x in self.data.values() if x.is_supernal(ignore_derived=True)])
             if count >= self.get_supernal_count() and value:
@@ -345,6 +356,7 @@ class StatHandler(BaseHandler):
                     f"{stat} is already a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
         stat.model.flag_2 = 1 if value else 0
         stat.model.save(update_fields=["flag_1"])
+        return stat, value
 
     def all_specialties(self):
         return CharacterSpecialty.objects.filter(stat__owner=self.owner, stat__stat__category=self.category).order_by(
@@ -400,6 +412,14 @@ class AttributeHandler(StatHandler):
     stat_classes = ATTRIBUTES
     category = "Attributes"
 
+    def get_caste_count(self):
+        return self.owner.caste_attributes
+
+    def get_favor_count(self):
+        return self.owner.favored_attributes
+
+    def get_supernal_count(self):
+        return self.owner.supernal_attributes
 
 EXISTS = {str(x) for x in [ATTRIBUTES + ABILITIES + ADVANTAGES + STYLES]}
 
@@ -407,6 +427,15 @@ EXISTS = {str(x) for x in [ATTRIBUTES + ABILITIES + ADVANTAGES + STYLES]}
 class AbilityHandler(StatHandler):
     category = "Abilities"
     stat_classes = ABILITIES
+
+    def get_caste_count(self):
+        return self.owner.caste_abilities
+
+    def get_favor_count(self):
+        return self.owner.favored_abilities
+
+    def get_supernal_count(self):
+        return self.owner.supernal_abilities
 
 
 class AdvantageHandler(StatHandler):

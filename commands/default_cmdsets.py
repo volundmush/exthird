@@ -36,6 +36,8 @@ class CharacterCmdSet(default_cmds.CharacterCmdSet):
         # any commands you add below will overload the default ones.
         #
         self.add(c.Sheet)
+        self.add(c.Editor)
+
 
 
 class AccountCmdSet(default_cmds.AccountCmdSet):

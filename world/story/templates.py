@@ -21,7 +21,8 @@ class Template(Character):
         "Essence": 1
     }
     extra_fields = {}
-    supernal_name = None
+    supernal_attribute_name = None
+    supernal_ability_name = None
 
     def at_object_creation(self):
         super().at_object_creation()
@@ -34,6 +35,7 @@ class Template(Character):
                     stat.set_value(v)
         self.story_attributes.reset_sub()
         self.story_abilities.reset_sub()
+        self.attributes.clear(category="extra")
 
     def pool_personal_max(self):
         pass
@@ -50,7 +52,38 @@ class Template(Character):
     def change_type(self, name: str):
         from world.story.templates import find_template, TEMPLATES
         found = find_template(name)
-        self.swap_typeclass(new_typeclass=found)
+        if not isinstance(self, found):
+            self.swap_typeclass(new_typeclass=found)
+            return True
+        return False
+
+    def get_type_name(self):
+        return getattr(self, "type_name", self.__class__.__name__)
+
+    def full_kind_name(self):
+        return f"{self.get_type_name()} {self.sub_name} {self.kind}"
+
+    def get_extra_field(self, name: str):
+        return self.attributes.get(name, category='extra', default='')
+
+    def set_extra_field(self, name: str, value: str):
+        if not name:
+            raise StoryDBException("Must enter a field name!")
+        if not (choice := partial_match(name, self.extra_fields.keys())):
+            raise StoryDBException("That is not a valid field name!")
+        if not value:
+            raise StoryDBException("Must enter a value!")
+        options = self.extra_fields[choice]
+        match options:
+            case True | False:
+                pass
+            case _:
+                if isinstance(options, list):
+                    if not (value := partial_match(value, options)):
+                        raise StoryDBException(f"Not a valid choice for {choice}! Choices are: {', '.join(options)}")
+        self.attributes.add(choice, value=value, category="extra")
+        return choice, value
+
 
 class _Mortal(Template):
     kind = "Mortal"
