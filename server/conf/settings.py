@@ -61,7 +61,7 @@ PLAYS_PER_ACCOUNT = None
 # forcibly terminated.
 PLAY_TIMEOUT_SECONDS = 30.0
 
-BASE_CHARACTER_TYPECLASS = "world.story.templates.Warrior"
+BASE_CHARACTER_TYPECLASS = "world.story.templates.Mortal"
 
 
 ######################################################################

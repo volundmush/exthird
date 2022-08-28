@@ -66,8 +66,11 @@ class _Stat(metaclass=MetaStat):
     def is_caste(self, ignore_derived=False) -> bool:
         return self.model.flag_1 == 2
 
-    def calculated_value(self):
+    def true_value(self):
         return self.model.value
+
+    def calculated_value(self):
+        return self.true_value()
 
     def set_value(self, value: int):
         self.model.value = value
@@ -77,6 +80,8 @@ class _Stat(metaclass=MetaStat):
         try:
             value = int(value)
         except ValueError as err:
+            raise StoryDBException(f"Value for {self} must be a number!")
+        except TypeError as err:
             raise StoryDBException(f"Value for {self} must be a number!")
         return value
 
@@ -133,8 +138,11 @@ class _DerivedAbility(_Ability):
         return False
 
     def calculated_value(self):
-        max_val = self.handler.owner.db_stats.filter(stat__category=self.check_path).aggregate(Max('value'))
-        return max_val.get('value__max', 0)
+        stats = self.handler.owner.db_stats.filter(stat__category=self.check_path)
+        if stats.count():
+            max_val = stats.aggregate(Max('value'))
+            return max_val.get('value__max', 0)
+        return self.default_value
 
 
 class Craft(_DerivedAbility):
@@ -244,6 +252,8 @@ class BaseHandler:
             value = int(value)
         except ValueError as err:
             raise StoryDBException(f"Value for {self.stat_type} must be a number!")
+        except TypeError as err:
+            raise StoryDBException(f"Value for {self.stat_type} must be a number!")
         return value
 
     def all(self):
@@ -290,6 +300,9 @@ class StatHandler(BaseHandler):
     def get_supernal_count(self):
         return 0
 
+    def get_caste(self):
+        return []
+
     def set_favored(self, stat: str, value: bool = True, toggle: bool = False):
         if not isinstance(stat, _Stat):
             stat = self.find_stat(stat)
@@ -304,7 +317,7 @@ class StatHandler(BaseHandler):
             if stat.is_favored(ignore_derived=True):
                 raise StoryDBException(f"{stat} is already a Favored {self.stat_type}!")
             if stat.is_caste(ignore_derived=True):
-                raise StoryDBException(f"{stat} has been picked as a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+                raise StoryDBException(f"{stat} has been picked as a {self.sub_name} {self.stat_type}!")
         else:
             if not stat.is_favored(ignore_derived=True):
                 raise StoryDBException(f"{stat} is not a Favored {self.stat_type}!")
@@ -316,21 +329,24 @@ class StatHandler(BaseHandler):
         if not isinstance(stat, _Stat):
             stat = self.find_stat(stat)
         if not stat.can_caste():
-            raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+            raise StoryDBException(f"{stat} cannot be a {self.owner.sub_name} {self.stat_type}!")
+        if str(stat) not in self.get_caste():
+            raise StoryDBException(
+                f"{stat} cannot be a {self.owner.sub_name} {self.stat_type}!")
         if toggle:
             value = not stat.is_caste(ignore_derived=True)
         if value:
             count = len([x for x in self.data.values() if x.is_caste(ignore_derived=True)])
             if count >= self.get_caste_count():
                 raise StoryDBException(
-                    f"Cannot set another {self.owner.story_template.template.sub_name} {self.stat_type}!")
+                    f"Cannot set another {self.owner.sub_name} {self.stat_type}!")
             if stat.is_caste(ignore_derived=True):
-                raise StoryDBException(f"{stat} is already a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+                raise StoryDBException(f"{stat} is already a {self.owner.sub_name} {self.stat_type}!")
             if stat.is_favored(ignore_derived=True):
                 raise StoryDBException(f"{stat} has been picked as a Favored {self.stat_type}!")
         else:
             if not stat.is_caste(ignore_derived=True):
-                raise StoryDBException(f"{stat} is not a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+                raise StoryDBException(f"{stat} is not a {self.owner.sub_name} {self.stat_type}!")
         stat.model.flag_1 = 2 if value else 0
         stat.model.save(update_fields=["flag_1"])
         return stat, value
@@ -339,23 +355,23 @@ class StatHandler(BaseHandler):
         if not isinstance(stat, _Stat):
             stat = self.find_stat(stat)
         if not stat.can_supernal():
-            raise StoryDBException(f"{stat} cannot be a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+            raise StoryDBException(f"{stat} cannot be a {self.owner.supernal_name} {self.stat_type}!")
         if toggle:
             value = not stat.is_supernal(ignore_derived=True)
         if value:
             count = len([x for x in self.data.values() if x.is_supernal(ignore_derived=True)])
             if count >= self.get_supernal_count() and value:
                 raise StoryDBException(
-                    f"Cannot set another {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+                    f"Cannot set another {self.owner.supernal_name} {self.stat_type}!")
             if not stat.is_caste():
                 raise StoryDBException(
-                    f"{stat} must first become a {self.owner.story_template.template.sub_name} {self.stat_type}!")
+                    f"{stat} must first become a {self.owner.sub_name} {self.stat_type}!")
         else:
             if not stat.is_supernal(ignore_derived=True):
                 raise StoryDBException(
-                    f"{stat} is already a {self.owner.story_template.template.supernal_name} {self.stat_type}!")
+                    f"{stat} is already a {self.owner.supernal_name} {self.stat_type}!")
         stat.model.flag_2 = 1 if value else 0
-        stat.model.save(update_fields=["flag_1"])
+        stat.model.save(update_fields=["flag_2"])
         return stat, value
 
     def all_specialties(self):
@@ -405,12 +421,13 @@ class CustomHandler(BaseHandler):
         value = self.valid_value(value)
         stat = self.find_stat(name)
         stat.set_value(value)
-        return stat
+        return stat, stat.calculated_value()
 
 
 class AttributeHandler(StatHandler):
     stat_classes = ATTRIBUTES
     category = "Attributes"
+    stat_type = 'Attribute'
 
     def get_caste_count(self):
         return self.owner.caste_attributes
@@ -421,12 +438,17 @@ class AttributeHandler(StatHandler):
     def get_supernal_count(self):
         return self.owner.supernal_attributes
 
+    def get_caste(self):
+        return self.owner.sub_attributes
+
+
 EXISTS = {str(x) for x in [ATTRIBUTES + ABILITIES + ADVANTAGES + STYLES]}
 
 
 class AbilityHandler(StatHandler):
     category = "Abilities"
     stat_classes = ABILITIES
+    stat_type = 'Ability'
 
     def get_caste_count(self):
         return self.owner.caste_abilities
@@ -436,6 +458,9 @@ class AbilityHandler(StatHandler):
 
     def get_supernal_count(self):
         return self.owner.supernal_abilities
+
+    def get_caste(self):
+        return self.owner.sub_abilities
 
 
 class AdvantageHandler(StatHandler):
@@ -449,7 +474,7 @@ class StyleHandler(StatHandler):
 
 
 class _Craft(_Stat):
-    base_path = ["Crafts"]
+    category = "Crafts"
     stat_type = 'Craft'
 
     def should_display(self) -> bool:

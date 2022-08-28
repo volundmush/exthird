@@ -10,7 +10,7 @@ from rich.columns import Columns
 
 _INFLECT = inflect.engine()
 
-_nodes = ["template", "attributes", "abilities", "merits", "charms", "spells", "evocations", "miscellaneous"]
+_nodes = ["template", "attributes", "abilities", "merits", "martial", "charms", "spells", "evocations", "miscellaneous"]
 
 
 def _table() -> Table:
@@ -70,7 +70,7 @@ def _field(caller, raw_string, **kwargs):
 
 
 _CHARGEN = [
-    "\nCHARGEN: Please set your sheet to its final state after spending bonus points. Mark down your BP expenditures in a +bg file named Bonus."
+    "\nCHARGEN: Please set your sheet to its final state after spending bonus points. Mark down your BP expenditures in a +cg file named Bonus."
 ]
 
 
@@ -83,28 +83,41 @@ def template(caller, raw_string, **kwargs):
     text = list()
     target = caller.ndb.target
     text.append(Text(f"Template: {target}", justify='center', style="bold"))
-    text.append(f"{target} is {_INFLECT.a(target.full_kind_name())}")
 
-    for k, v in target.extra_fields.items():
-        match v:
-            case True:
-                text.append(f"REQUIRED FIELD: {k}")
-            case False:
-                text.append(f"OPTIONAL FIELD: {k}")
-            case _:
-                if isinstance(v, list):
-                    text.append(f"CHOICES FIELD: {k} - {', '.join(v)}")
-                else:
-                    text.append(f"UNKNOWN FIELD: {k}")
-        text.append(f"CURRENTLY: {target.get_extra_field(k)}")
+    from world.story.templates import TEMPLATES
+
+    text.append("Templates:")
+    for k, v in TEMPLATES.items():
+        if isinstance(v, list):
+            text.append(f"{k}: {', '.join([x.get_type_name() for x in v])}")
+        else:
+            text.append(k)
 
     if caller.ndb.chargen:
-        text.extend(_CHARGEN)
+        text.extend(target.chargen_template)
 
+    text.append(f"\n{target} is {_INFLECT.a(target.full_kind_name())}\n")
     if target.extra_fields:
         options.append({"key": "field", "desc": "set field",
                         "syntax": "field <name>=<value>",
                         "goto": _field})
+
+        text.append(f"Extra Fields for {_INFLECT.a(target.full_kind_name())}:")
+        for k, v in target.extra_fields.items():
+            match v:
+                case True:
+                    text.append(f"REQUIRED FIELD: {k}")
+                case False:
+                    text.append(f"OPTIONAL FIELD: {k}")
+                case _:
+                    if isinstance(v, list):
+                        text.append(f"CHOICES FIELD: {k} - {', '.join(v)}")
+                    else:
+                        text.append(f"UNKNOWN FIELD: {k}")
+            text.append(f"CURRENTLY: {target.get_extra_field(k)}")
+
+    if caller.ndb.chargen:
+        text.extend(_CHARGEN)
 
     table = _table()
 
@@ -188,6 +201,9 @@ def attributes(caller, raw_string, **kwargs):
 
     text.append(columns)
 
+    if caller.ndb.chargen:
+        text.extend(target.chargen_attributes)
+
     options.append({"key": "set", "desc": "Set Attribute Rating",
                     "syntax": "set <attribute>=<value>",
                     "goto": _attribute})
@@ -221,27 +237,78 @@ def attributes(caller, raw_string, **kwargs):
 
 
 def _ability(caller, raw_string, **kwargs):
-    pass
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_abilities.set(caller.ndb._menu_match.group("lsargs"),
+                                                  caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {stat} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
 
 
 def _favor_ability(caller, raw_string, **kwargs):
-    pass
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_abilities.set_favored(caller.ndb._menu_match.group("args"), toggle=True)
+        outcome = "now Favored" if value else "no longer Favored"
+        target.msg(f"Your {stat} is {outcome}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is {outcome}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
 
 
 def _caste_ability(caller, raw_string, **kwargs):
-    pass
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_abilities.set_caste(caller.ndb._menu_match.group("args"), toggle=True)
+        outcome = f"now {_INFLECT.a(target.sub_name)} Ability" if value else f"no longer {_INFLECT.a(target.sub_name)} Ability"
+        target.msg(f"Your {stat} is {outcome}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is {outcome}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
 
 
 def _supernal_ability(caller, raw_string, **kwargs):
-    pass
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_abilities.set_supernal(caller.ndb._menu_match.group("args"), toggle=True)
+        outcome = f"now {_INFLECT.a(target.supernal_ability_name)} Ability" if value else f"no longer {_INFLECT.a(target.supernal_ability_name)} Ability"
+        target.msg(f"Your {stat} is {outcome}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is {outcome}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
 
 
 def _craft(caller, raw_string, **kwargs):
-    pass
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_crafts.set(caller.ndb._menu_match.group("lsargs"),
+                                                 caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {stat} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
 
 
-def _style(caller, raw_string, **kwargs):
-    pass
+def _format_ability(stat, target, ignore_extra=False):
+    out = f"{str(stat)}: {stat.calculated_value()}"
+    par = list()
+    if not ignore_extra:
+        if stat.is_favored():
+            par.append("Favored")
+        if stat.is_caste():
+            par.append(target.sub_name)
+        if stat.is_supernal():
+            par.append(target.supernal_ability_name)
+    if par:
+        return f"{out} ({', '.join(par)})"
+    return out
 
 
 def abilities(caller, raw_string, **kwargs):
@@ -249,9 +316,52 @@ def abilities(caller, raw_string, **kwargs):
     target = caller.ndb.target
     text = list()
     text.append(Text(f"Abilities: {target}", justify='center', style="bold"))
+
+    stats = target.story_abilities.all()
+    columns = Columns([_format_ability(x, target) for x in stats])
+
+    text.append(columns)
+
+    if (crafts := target.story_crafts.all()):
+        text.append(Text(f"Crafts", justify='center', style="bold"))
+        columns = Columns([_format_ability(x, target, ignore_extra=True) for x in crafts])
+
+        text.append(columns)
+
+    text.append("Martial Arts and Craft cannot be assigned a rating directly. Their displayed rating is equal to the highest taken Crafts or MA Style.")
+    if target.caste_abilities or target.favored_abilities:
+        text.append(f"Martial Arts cannot be picked as a Favored or {target.sub_name} Ability directly.")
+        text.append(f"It inherits the status of Brawl.")
+        if target.supernal_abilities:
+            text.append(f"Martial Art can be chosen as a {target.supernal_ability_name} Ability if Brawl is a {target.sub_name} Ability.")
+
+    if caller.ndb.chargen:
+        if target.favored_abilities or target.caste_abilities or target.supernal_abilities:
+            text.append(f"\n{_INFLECT.a(target.full_kind_name())} receives:")
+            if target.caste_abilities:
+                count = [x for x in stats if x.is_caste(ignore_derived=True)]
+                text.append(f"{len(count)}/{target.caste_abilities} {target.sub_name} Abilities, chosen from {', '.join(target.sub_abilities)}")
+            if target.supernal_abilities:
+                count = [x for x in stats if x.is_supernal(ignore_derived=True)]
+                text.append(
+                    f"{len(count)}/{target.supernal_abilities} {target.supernal_ability_name} Abilities, from among the selected {target.sub_name} Abilities.")
+            if target.favored_abilities:
+                count = [x for x in stats if x.is_favored(ignore_derived=True)]
+                text.append(
+                    f"{len(count)}/{target.favored_abilities} Favored Abilities.")
+            if target.dots_abilities:
+                count = sum([x.true_value() for x in stats])
+                styles = sum([x.true_value() for x in target.story_styles.all()])
+                craft_count = sum([x.true_value() for x in crafts])
+                text.append(f"{sum([count, styles, craft_count])}/{target.dots_abilities} Ability Dots (Crafts: {craft_count}, Styles: {styles})")
+            if target.dots_specialties:
+                count = len(target.story_abilities.all_specialties())
+                text.append(f"{count}/{target.dots_specialties} Specialtiy Dots")
+        text.extend(target.chargen_abilities)
+
+
     if caller.ndb.chargen:
         text.extend(_CHARGEN)
-    text.append(f"ABILITIES: {', '.join([str(x) for x in target.story_abilities.all()])}")
 
     options.append({"key": "set", "desc": "Set Ability Rating",
                     "syntax": "set <ability>=<value>",
@@ -272,6 +382,10 @@ def abilities(caller, raw_string, **kwargs):
                         "syntax": f"{target.supernal_ability_name.lower()} <ability>",
                         "goto": _supernal_ability})
 
+    options.append({"key": "craft", "desc": "Set Craft Rating",
+                    "syntax": "craft <craft>=<value>",
+                    "goto": _craft})
+
     table = _table()
 
     text = [escape(t) if isinstance(t, str) else t for t in text]
@@ -286,6 +400,40 @@ def merits(caller, raw_string, **kwargs):
     text = list()
     target = caller.ndb.target
     text.append(Text(f"Merits: {target}", justify='center', style="bold"))
+    if caller.ndb.chargen:
+        text.extend(_CHARGEN)
+
+    table = _table()
+
+    text = [escape(t) if isinstance(t, str) else t for t in text]
+    table.add_row(Group(*text))
+
+    options.extend(_main_options(caller))
+    return table, options
+
+
+def _style(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_styles.set(caller.ndb._menu_match.group("lsargs"),
+                                                  caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {stat} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def martial(caller, raw_string, **kwargs):
+    options = list()
+    text = list()
+    target = caller.ndb.target
+    text.append(Text(f"Martial Arts: {target}", justify='center', style="bold"))
+
+    options.append({"key": "set", "desc": "Set Style Rating",
+                    "syntax": "set <style>=<value>",
+                    "goto": _ability})
+
     if caller.ndb.chargen:
         text.extend(_CHARGEN)
 

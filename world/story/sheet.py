@@ -24,8 +24,8 @@ class SheetHandler:
     def render_stat(self, stat, colors=None):
         if colors is None:
             colors = self.colors()
-        out = list()
-        out.append(Text(f"{stat.calculated_value():>2}", style=colors.get("stat_value")))
+        out = Text("", justify="right")
+
         if stat.is_supernal():
             out.append(Text(str(stat), style=colors.get("stat_supernal")))
         elif stat.is_caste():
@@ -34,7 +34,9 @@ class SheetHandler:
             out.append(Text(str(stat), style=colors.get("stat_favored")))
         else:
             out.append(Text(str(stat), style=colors.get("stat_name")))
-        return Text(" ").join(out)
+        #out.append(" ")
+        out.append(Text(f"{stat.calculated_value():>2}", style=colors.get("stat_value")))
+        return out
 
     def render_stats(self, stats, colors: dict=None):
         if colors is None:

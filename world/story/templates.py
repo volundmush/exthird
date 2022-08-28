@@ -13,7 +13,8 @@ class Template(Character):
     caste_abilities = 0
     favored_abilities = 0
     supernal_abilities = 0
-    specialties = 4
+    dots_abilities = 28
+    dots_specialties = 4
     sub_name = "Caste"
     sheet_colors = {}
     start_advantages = {
@@ -23,6 +24,10 @@ class Template(Character):
     extra_fields = {}
     supernal_attribute_name = None
     supernal_ability_name = None
+    chargen_template = []
+    chargen_attributes = []
+    chargen_abilities = []
+
 
     def at_object_creation(self):
         super().at_object_creation()
@@ -57,8 +62,9 @@ class Template(Character):
             return True
         return False
 
-    def get_type_name(self):
-        return getattr(self, "type_name", self.__class__.__name__)
+    @classmethod
+    def get_type_name(cls):
+        return getattr(cls, "type_name", cls.__name__)
 
     def full_kind_name(self):
         return f"{self.get_type_name()} {self.sub_name} {self.kind}"
@@ -85,7 +91,7 @@ class Template(Character):
         return choice, value
 
 
-class _Mortal(Template):
+class Mortal(Template):
     kind = "Mortal"
     sub_name = "Archetype"
     extra_fields = {"Profession": None}
@@ -95,30 +101,10 @@ class _Mortal(Template):
     }
 
 
-class Warrior(_Mortal):
-    pass
-
-
-class Priest(_Mortal):
-    pass
-
-
-class Savant(_Mortal):
-    pass
-
-
-class Criminal(_Mortal):
-    pass
-
-
-class Broker(_Mortal):
-    pass
-
-
 class _Solaroid(Template):
     favored_abilities = 5
     caste_abilities = 5
-    supernal_abilities = 1
+    chargen_abilities = ["Every Favored Ability must have at least one dot!"]
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 3) + 10
@@ -127,27 +113,14 @@ class _Solaroid(Template):
         return (self.get_advantage_value("Essence") * 7) + 26
 
 
-class _Dawnoid(_Solaroid):
-    sub_abilities = ["Archery", "Awareness", "Brawl", "Dodge", "Melee", "Resistance", "Thrown", "War"]
+_DAWN = ["Archery", "Awareness", "Brawl", "Dodge", "Melee", "Resistance", "Thrown", "War"]
+_ZENITH = ["Athletics", "Integrity", "Performance", "Lore", "Presence", "Resistance", "Survival", "War"]
+_TWILIGHT = ["Bureaucracy", "Craft", "Integrity", "Investigation", "Linguistics", "Lore", "Medicine", "Occult"]
+_NIGHT = ["Athletics", "Awareness", "Dodge", "Investigation", "Larceny", "Ride", "Stealth", "Socialize"]
+_ECLIPSE = ["Bureaucracy", "Larceny", "Linguistics", "Occult", "Presence", "Ride", "Sail", "Socialize"]
 
 
-class _Zenithoid(_Solaroid):
-    sub_abilities = ["Athletics", "Integrity", "Performance", "Lore", "Presence", "Resistance", "Survival", "War"]
-
-
-class _Twilightoid(_Solaroid):
-    sub_abilities = ["Bureaucracy", "Craft", "Integrity", "Investigation", "Linguistics", "Lore", "Medicine", "Occult"]
-
-
-class _Nightoid(_Solaroid):
-    sub_abilities = ["Athletics", "Awareness", "Dodge", "Investigation", "Larceny", "Ride", "Stealth", "Socialize"]
-
-
-class _Eclipsoid(_Solaroid):
-    sub_abilities = ["Bureaucracy", "Larceny", "Linguistics", "Occult", "Presence", "Ride", "Sail", "Socialize"]
-
-
-class _Solar(Template):
+class _Solar(_Solaroid):
     kind = "Solar"
     sheet_colors = {"border": "bold yellow",
                     "stat_value": "bold green",
@@ -157,30 +130,32 @@ class _Solar(Template):
                     "stat_header": "bold red",
                     "power_subcategory": "bold yellow"
                     }
-    supernal_name = "Supernal"
+    supernal_abilities = 1
+    supernal_ability_name = "Supernal"
+    chargen_attributes = ["Solars distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins 1 for free."]
 
 
-class Dawn(_Dawnoid, _Solar):
-    pass
+class Dawn(_Solar):
+    sub_abilities = _DAWN
 
 
-class Zenith(_Zenithoid, _Solar):
-    pass
+class Zenith(_Solar):
+    sub_abilities = _ZENITH
 
 
-class Twilight(_Twilightoid, _Solar):
-    pass
+class Twilight(_Solar):
+    sub_abilities = _TWILIGHT
 
 
-class Night(_Nightoid, _Solar):
-    pass
+class Night(_Solar):
+    sub_abilities = _NIGHT
 
 
-class Eclipse(_Eclipsoid, _Solar):
-    pass
+class Eclipse(_Solar):
+    sub_abilities = _ECLIPSE
 
 
-class _Abyssal(Template):
+class _Abyssal(_Solaroid):
     kind = "Abyssal"
     sheet_colors = {"border": "bold black",
                     "stat_value": "red",
@@ -190,30 +165,32 @@ class _Abyssal(Template):
                     "stat_header": "not bold magenta",
                     "power_subcategory": "bold black"
                     }
-    supernal_name = "Chthonic"
+    supernal_abilities = 1
+    supernal_ability_name = "Chthonic"
+    chargen_attributes = ["Abyssals distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins 1 for free."]
 
 
-class Dusk(_Dawnoid, _Abyssal):
-    pass
+class Dusk(_Abyssal):
+    sub_abilities = _DAWN
 
 
-class Midnight(_Zenithoid, _Abyssal):
-    pass
+class Midnight(_Abyssal):
+    sub_abilities = _ZENITH
 
 
-class Daybreak(_Twilightoid, _Abyssal):
-    pass
+class Daybreak(_Abyssal):
+    sub_abilities = _TWILIGHT
 
 
-class Day(_Nightoid, _Abyssal):
-    pass
+class Day(_Abyssal):
+    sub_abilities = _NIGHT
 
 
-class Moonshadow(_Eclipsoid, _Abyssal):
-    pass
+class Moonshadow(_Abyssal):
+    sub_abilities = _ECLIPSE
 
 
-class _Infernal(Template):
+class _Infernal(_Solaroid):
     kind = "Infernal"
     sub_types = ["Azimuth", "Ascendant", "Horizon", "Nadir", "Penumbra"]
     default_sub = "Azimuth"
@@ -227,24 +204,24 @@ class _Infernal(Template):
                     }
 
 
-class Azimuth(_Dawnoid, _Infernal):
-    pass
+class Azimuth(_Infernal):
+    sub_abilities = _DAWN
 
 
-class Ascendant(_Zenithoid, _Infernal):
-    pass
+class Ascendant(_Infernal):
+    sub_abilities = _ZENITH
 
 
-class Horizon(_Twilightoid, _Infernal):
-    pass
+class Horizon(_Infernal):
+    sub_abilities = _TWILIGHT
 
 
-class Nadir(_Nightoid, _Infernal):
-    pass
+class Nadir(_Infernal):
+    sub_abilities = _NIGHT
 
 
-class Penumbra(_Eclipsoid, _Infernal):
-    pass
+class Penumbra(_Infernal):
+    sub_abilities = _ECLIPSE
 
 
 class _Lunar(Template):
@@ -503,7 +480,7 @@ class Umbral(_CelestialPools):
 
 
 TEMPLATES = {
-    "Mortal": [Warrior, Priest, Savant, Criminal, Broker],
+    "Mortal": Mortal,
     "Solar": [Dawn, Zenith, Twilight, Night, Eclipse],
     "Abyssal": [Dusk, Midnight, Daybreak, Day, Moonshadow],
     "Infernal": [Azimuth, Ascendant, Horizon, Nadir, Penumbra],
