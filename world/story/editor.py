@@ -7,10 +7,11 @@ from rich.text import Text
 from rich.markup import escape
 from rich.box import ASCII2
 from rich.columns import Columns
+from world.story.powers import CHARM_CATEGORIES, SPELL_CATEGORIES
 
 _INFLECT = inflect.engine()
 
-_nodes = ["template", "attributes", "abilities", "merits", "martial", "charms", "spells", "evocations", "miscellaneous"]
+_nodes = ["template", "attributes", "abilities", "merits", "powers", "miscellaneous"]
 
 
 def _table() -> Table:
@@ -200,8 +201,30 @@ def attributes(caller, raw_string, **kwargs):
     columns = Columns([_format_attribute(x, target) for x in stats])
 
     text.append(columns)
+    text.append("")
 
     if caller.ndb.chargen:
+        if target.favored_attributes or target.caste_attributes or target.supernal_attributes:
+            text.append(f"\n{_INFLECT.a(target.full_kind_name())} receives:")
+            if target.caste_attributes:
+                count = [x for x in stats if x.is_caste(ignore_derived=True)]
+                text.append(
+                    f"{len(count)}/{target.caste_attributes} {target.sub_name} Attributes, chosen from {', '.join(target.sub_attributes)}")
+            if target.supernal_attributes:
+                count = [x for x in stats if x.is_supernal(ignore_derived=True)]
+                text.append(
+                    f"{len(count)}/{target.supernal_attributes} {target.supernal_ability_name} Attributes, from among the selected {target.sub_name} Attributes.")
+            if target.favored_attributes:
+                count = [x for x in stats if x.is_favored(ignore_derived=True)]
+                text.append(
+                    f"{len(count)}/{target.favored_attributes} Favored Attributes.")
+        if target.dots_attributes:
+            physical = sum([x.true_value() - 1 for x in target.story_attributes.all_physical()])
+            social = sum([x.true_value() - 1 for x in target.story_attributes.all_social()])
+            mental = sum([x.true_value() -1 for x in target.story_attributes.all_mental()])
+            count = sum([physical, social, mental])
+            text.append(
+                f"{count}/{target.dots_attributes} Attribute Dots (Physical: {physical}, Social: {social}, Mental: {mental})")
         text.extend(target.chargen_attributes)
 
     options.append({"key": "set", "desc": "Set Attribute Rating",
@@ -296,6 +319,18 @@ def _craft(caller, raw_string, **kwargs):
         caller.msg(f"ERROR: {err}")
 
 
+def _style(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        stat, value = target.story_styles.set(caller.ndb._menu_match.group("lsargs"),
+                                                  caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {stat} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {stat} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
 def _format_ability(stat, target, ignore_extra=False):
     out = f"{str(stat)}: {stat.calculated_value()}"
     par = list()
@@ -325,8 +360,14 @@ def abilities(caller, raw_string, **kwargs):
     if (crafts := target.story_crafts.all()):
         text.append(Text(f"Crafts", justify='center', style="bold"))
         columns = Columns([_format_ability(x, target, ignore_extra=True) for x in crafts])
-
         text.append(columns)
+        text.append("")
+
+    if (styles := target.story_styles.all()):
+        text.append(Text(f"Styles", justify='center', style="bold"))
+        columns = Columns([_format_ability(x, target, ignore_extra=True) for x in styles])
+        text.append(columns)
+        text.append("")
 
     text.append("Martial Arts and Craft cannot be assigned a rating directly. Their displayed rating is equal to the highest taken Crafts or MA Style.")
     if target.caste_abilities or target.favored_abilities:
@@ -386,6 +427,10 @@ def abilities(caller, raw_string, **kwargs):
                     "syntax": "craft <craft>=<value>",
                     "goto": _craft})
 
+    options.append({"key": "style", "desc": "Set Style Rating",
+                    "syntax": "style <style>=<value>",
+                    "goto": _style})
+
     table = _table()
 
     text = [escape(t) if isinstance(t, str) else t for t in text]
@@ -412,27 +457,227 @@ def merits(caller, raw_string, **kwargs):
     return table, options
 
 
-def _style(caller, raw_string, **kwargs):
+def _charm(caller, raw_string, **kwargs):
     try:
         target = caller.ndb.target
-        stat, value = target.story_styles.set(caller.ndb._menu_match.group("lsargs"),
-                                                  caller.ndb._menu_match.group("rsargs"))
-        target.msg(f"Your {stat} is now: {value}")
+        power, value = target.story_charms.add(caller.ndb._menu_match.group("lsargs"),
+                                              caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
         if caller != target:
-            caller.msg(f"{target}'s {stat} is now: {value}")
+            caller.msg(f"{target}'s {power} is now: {value}")
     except StoryDBException as err:
         caller.msg(f"ERROR: {err}")
 
 
-def martial(caller, raw_string, **kwargs):
+def _delcharm(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_charms.remove(caller.ndb._menu_match.group("lsargs"),
+                                               caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _spell(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_spells.add(caller.ndb._menu_match.group("lsargs"),
+                                               caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _delspell(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_spells.remove(caller.ndb._menu_match.group("lsargs"),
+                                                  caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _ocharm(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        args = caller.ndb._menu_match.group("lsargs").split("/")
+        if len(args) != 2:
+            raise StoryDBException("usage: ocharm <kind>/<category>=<name>")
+        power, value = target.story_charms.add(args[1],
+                                               caller.ndb._menu_match.group("rsargs"), main_category=args[0])
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _delocharm(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        args = caller.ndb._menu_match.group("lsargs").split("/")
+        if len(args) != 2:
+            raise StoryDBException("usage: ocharm <kind>/<category>=<name>")
+        power, value = target.story_charms.remove(args[1],
+                                               caller.ndb._menu_match.group("rsargs"), main_category=args[0])
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _macharm(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_charms.add(caller.ndb._menu_match.group("lsargs"),
+                                               caller.ndb._menu_match.group("rsargs"),
+                                               main_category="Martial Arts")
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _delmacharm(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_charms.remove(caller.ndb._menu_match.group("lsargs"),
+                                               caller.ndb._menu_match.group("rsargs"),
+                                               main_category="Martial Arts")
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _evocation(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_evocations.add(caller.ndb._menu_match.group("lsargs"),
+                                               caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _delevocation(caller, raw_string, **kwargs):
+    try:
+        target = caller.ndb.target
+        power, value = target.story_evocations.remove(caller.ndb._menu_match.group("lsargs"),
+                                                   caller.ndb._menu_match.group("rsargs"))
+        target.msg(f"Your {power} is now: {value}")
+        if caller != target:
+            caller.msg(f"{target}'s {power} is now: {value}")
+    except StoryDBException as err:
+        caller.msg(f"ERROR: {err}")
+
+
+def _format_power(power, target, ignore_extra=False):
+    if power.value > 1:
+        return f"{power} ({power.value})"
+    return str(power)
+
+
+def powers(caller, raw_string, **kwargs):
     options = list()
     text = list()
     target = caller.ndb.target
-    text.append(Text(f"Martial Arts: {target}", justify='center', style="bold"))
+    text.append(Text(f"Powers: {target}", justify='center', style="bold"))
 
-    options.append({"key": "set", "desc": "Set Style Rating",
-                    "syntax": "set <style>=<value>",
-                    "goto": _ability})
+    if (charms := target.story_charms.all_main()):
+        text.append(Text(f"Charms", justify='center', style="bold"))
+        for category, _subcat in charms.items():
+            for subcat, entries in _subcat.items():
+                text.append(Text(f"{category}: {subcat}", justify='center', style='bold'))
+                columns = Columns([_format_power(x, target, ignore_extra=True) for x in entries])
+                text.append(columns)
+        text.append("")
+
+    if (spells := target.story_spells.all_main()):
+        text.append(Text(f"Spells", justify='center', style="bold"))
+        for category, _subcat in spells.items():
+            for subcat, entries in _subcat.items():
+                text.append(Text(f"{category}: {subcat}", justify='center', style='bold'))
+                columns = Columns([_format_power(x, target, ignore_extra=True) for x in entries])
+                text.append(columns)
+        text.append("")
+
+    if (evocations := target.story_evocations.all_main()):
+        for category, entries in evocations["Evocations"].items():
+            text.append(Text(f"Evocations: {category}", justify='center', style='bold'))
+            columns = Columns([_format_power(x, target, ignore_extra=True) for x in entries])
+            text.append(columns)
+        text.append("")
+
+    if caller.ndb.chargen:
+        text.append(f"\n{_INFLECT.a(target.full_kind_name())} receives:")
+        if target.starting_charms:
+            charms_count = target.story_charms.count()
+            spells_count = target.story_spells.count()
+            evocations_count = target.story_evocations.count()
+            text.append(f"{charms_count+spells_count+evocations_count}/{target.starting_charms} starting Charms/Spells/Evocations.")
+        text.extend(target.chargen_powers)
+
+
+    if CHARM_CATEGORIES.get(target.native_charm_category()):
+        options.append({"key": "charm", "desc": "Add a native Charm. Add again to repurchase.",
+                        "syntax": "charm <category>=<name>",
+                        "goto": _charm})
+
+    if charms.pop(target.native_charm_category(), None):
+        options.append({"key": "delcharm", "desc": "Remove a native Charm purchase.",
+                        "syntax": "delcharm <category>=<name>",
+                        "goto": _delcharm})
+
+    if target.story_styles.count():
+        options.append({"key": "macharm", "desc": "Add a Martial Arts Charm. Add again to repurchase.",
+                        "syntax": "macharm <style>=<name>",
+                        "goto": _macharm})
+
+    if charms.pop("Martial Arts", None):
+        options.append({"key": "delmacharm", "desc": "Remove a Martial Arts Charm purchase.",
+                        "syntax": "delmacharm <style>=<name>",
+                        "goto": _delmacharm})
+
+    options.append({"key": "spell", "desc": "Add a Sorcery/Necromancy Spell.",
+                    "syntax": "spell <category>=<name>",
+                    "goto": _spell})
+
+    if spells:
+        options.append({"key": "delspell", "desc": "Remove a Sorcery/Necromancy Spell.",
+                        "syntax": "delspell <category>=<name>",
+                        "goto": _delspell})
+
+    options.append({"key": "evocation", "desc": "Add Evocations. Again to repurchase.",
+                    "syntax": "evocation <category>=<name>",
+                    "goto": _evocation})
+
+    if evocations:
+        options.append({"key": "delevocation", "desc": "Remove Evocations.",
+                        "syntax": "delevocation <category>=<name>",
+                        "goto": _delevocation})
+
+    options.append({"key": "ocharm", "desc": "Add non-native Charms. Again to repurchase.",
+                    "syntax": "ocharm <kind>/<category>=<name>",
+                    "goto": _ocharm})
+
+    if charms:
+        options.append({"key": "delocharm", "desc": "Remove non-native Charm Purchases.",
+                        "syntax": "delocharm <kind>/<category>=<name>",
+                        "goto": _delocharm})
 
     if caller.ndb.chargen:
         text.extend(_CHARGEN)
@@ -445,56 +690,6 @@ def martial(caller, raw_string, **kwargs):
     options.extend(_main_options(caller))
     return table, options
 
-
-def charms(caller, raw_string, **kwargs):
-    options = list()
-    text = list()
-    target = caller.ndb.target
-    text.append(Text(f"Charms: {target}", justify='center', style="bold"))
-    if caller.ndb.chargen:
-        text.extend(_CHARGEN)
-
-    table = _table()
-
-    text = [escape(t) if isinstance(t, str) else t for t in text]
-    table.add_row(Group(*text))
-
-    options.extend(_main_options(caller))
-    return table, options
-
-
-def spells(caller, raw_string, **kwargs):
-    options = list()
-    text = list()
-    target = caller.ndb.target
-    text.append(Text(f"Spells: {target}", justify='center', style="bold"))
-    if caller.ndb.chargen:
-        text.extend(_CHARGEN)
-
-    table = _table()
-
-    text = [escape(t) if isinstance(t, str) else t for t in text]
-    table.add_row(Group(*text))
-
-    options.extend(_main_options(caller))
-    return table, options
-
-
-def evocations(caller, raw_string, **kwargs):
-    options = list()
-    text = list()
-    target = caller.ndb.target
-    text.append(Text(f"Evocations: {target}", justify='center', style="bold"))
-    if caller.ndb.chargen:
-        text.extend(_CHARGEN)
-
-    table = _table()
-
-    text = [escape(t) if isinstance(t, str) else t for t in text]
-    table.add_row(Group(*text))
-
-    options.extend(_main_options(caller))
-    return table, options
 
 
 def miscellaneous(caller, raw_string, **kwargs):

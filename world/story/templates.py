@@ -13,8 +13,10 @@ class Template(Character):
     caste_abilities = 0
     favored_abilities = 0
     supernal_abilities = 0
+    dots_attributes = 18
     dots_abilities = 28
     dots_specialties = 4
+    starting_charms = 0
     sub_name = "Caste"
     sheet_colors = {}
     start_advantages = {
@@ -27,6 +29,7 @@ class Template(Character):
     chargen_template = []
     chargen_attributes = []
     chargen_abilities = []
+    chargen_powers = []
 
 
     def at_object_creation(self):
@@ -105,6 +108,7 @@ class _Solaroid(Template):
     favored_abilities = 5
     caste_abilities = 5
     chargen_abilities = ["Every Favored Ability must have at least one dot!"]
+    starting_charms = 15
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 3) + 10
@@ -132,7 +136,7 @@ class _Solar(_Solaroid):
                     }
     supernal_abilities = 1
     supernal_ability_name = "Supernal"
-    chargen_attributes = ["Solars distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins 1 for free."]
+    chargen_attributes = ["Solars distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins at 1 for free."]
 
 
 class Dawn(_Solar):
@@ -167,7 +171,7 @@ class _Abyssal(_Solaroid):
                     }
     supernal_abilities = 1
     supernal_ability_name = "Chthonic"
-    chargen_attributes = ["Abyssals distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins 1 for free."]
+    chargen_attributes = ["Abyssals distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins at 1 for free."]
 
 
 class Dusk(_Abyssal):
@@ -202,6 +206,8 @@ class _Infernal(_Solaroid):
                     "stat_header": "bold cyan",
                     "power_subcategory": "bold green"
                     }
+    chargen_attributes = [
+        "Infernals distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins at 1 for free."]
 
 
 class Azimuth(_Infernal):
@@ -238,6 +244,10 @@ class _Lunar(Template):
 
     extra_fields = {"Spirit Shape": True,
                     "Tell": True}
+    dots_attributes = 21
+    starting_charms = 15
+    chargen_attributes = [
+        "Lunars distribute 9/7/5 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins at 1 for free."]
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 15
@@ -247,7 +257,9 @@ class _Lunar(Template):
 
 
 class Casteless(_Lunar):
-    pass
+
+    def full_kind_name(self):
+        return "Casteless Lunar"
 
 
 class _Tattooed(_Lunar):
@@ -310,6 +322,8 @@ class Serenity(_Sidereal):
 class _DragonBlood(Template):
     kind = "Dragon-Blooded"
     favored_abilities = 5
+    dots_specialties = 3
+    starting_charms = 15
     sub_name = "Aspect"
     sheet_colors = {"border": "bold red",
                     "stat_value": "bold green",
@@ -319,6 +333,8 @@ class _DragonBlood(Template):
                     "stat_header": "bold cyan",
                     "power_subcategory": "not bold cyan"
                     }
+    chargen_attributes = [
+        "Dragon-Blooded distribute 8/6/4 Primary/Secondary/Tertiary points amongst their Attributes. Remember, each begins at 1 for free."]
 
     def pool_personal_max(self):
         return (self.get_advantage_value("Essence") * 1) + 11

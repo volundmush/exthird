@@ -4,6 +4,7 @@ from evennia.utils.utils import lazy_property
 from world.story.exceptions import StoryDBException
 from world.story.stats import BaseHandler, ATTRIBUTES, ABILITIES, STYLES
 from collections import defaultdict
+from django.db.models import Sum
 
 ESSENCE_CHARMS = ["Essence"]
 
@@ -61,11 +62,10 @@ class PowerNameHandler(BaseHandler):
         return sub_category
 
     def get_power(self, main_category: str, sub_category: str, name: str):
-        power, created = Power.objects.get_or_create(root=self.base, category=main_category, subcategory=sub_category,
-                                                     name=name)
-        if created:
-            power.creator = self.owner
-            power.save()
+        if not (power := Power.objects.filter(root=self.base, category=main_category, subcategory=sub_category,
+                                                     name=name).first()):
+            power = Power.objects.create(root=self.base, category=main_category, subcategory=sub_category,
+                                                     name=name, creator=self.owner)
         return power
 
     def set(self, sub_category: str, name: str, value: int = 1, main_category: str = None):
@@ -75,9 +75,36 @@ class PowerNameHandler(BaseHandler):
         value = self.valid_value(value)
         power = self.get_power(main_category, sub_category, name)
         row, created = self.owner.db_powers.get_or_create(power=power)
-        row.stat_value = value
+        row.value = value
         row.save()
-        return row
+        return row, row.value
+
+    def add(self, sub_category: str, name: str, main_category: str = None):
+        main_category = self.get_main_category(main_category)
+        sub_category = self.get_sub_category(main_category, sub_category)
+        name = self.good_name(name)
+        power = self.get_power(main_category, sub_category, name)
+        row, created = self.owner.db_powers.get_or_create(power=power)
+        if not created:
+            row.value += 1
+        row.save()
+        return row, row.value
+
+    def remove(self, sub_category: str, name: str, main_category: str = None):
+        main_category = self.get_main_category(main_category)
+        sub_category = self.get_sub_category(main_category, sub_category)
+        name = self.good_name(name)
+        if not (power := Power.objects.filter(root=self.base, category=main_category, subcategory=sub_category,
+                                                     name=name).first()):
+            raise StoryDBException(f"That power does not exist.")
+        if not (row := self.owner.db_powers.filter(power=power).first()):
+            raise StoryDBException(f"No entry to remove!")
+        if row.value > 0:
+            row.value -= 1
+            row.save()
+        if not row.value:
+            row.delete()
+        return row, row.value
 
     def all(self):
         return self.owner.db_powers.filter(power__root=self.base).order_by("power__category", "power__subcategory", "power__name")
@@ -85,8 +112,14 @@ class PowerNameHandler(BaseHandler):
     def all_main(self):
         out = defaultdict(lambda: defaultdict(list))
         for x in self.all():
-            out[x.stat.name_2][x.stat.name_3].append(x)
+            out[x.power.category][x.power.subcategory].append(x)
         return out
+
+    def count(self):
+        if (all := self.all()):
+            val = all.aggregate(Sum('value'))
+            return val.get('value__sum', 0)
+        return 0
 
 
 class CharmHandler(PowerNameHandler):
@@ -95,7 +128,7 @@ class CharmHandler(PowerNameHandler):
     base = "Charms"
 
     def default_category(self):
-        return self.owner.story_template.template.native_charm_category()
+        return self.owner.native_charm_category()
 
 
 class SpellHandler(PowerNameHandler):

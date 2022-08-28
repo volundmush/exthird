@@ -259,6 +259,9 @@ class BaseHandler:
     def all(self):
         return sorted(list(self.data.values()), key=lambda x: str(x))
 
+    def count(self):
+        return sum([x.true_value() for x in self.data.values()])
+
 
 class StatHandler(BaseHandler):
     stat_classes = []
@@ -389,9 +392,10 @@ class CustomHandler(BaseHandler):
     base_class = None
     class_storage = dict()
     custom = True
+    category = None
 
     def query(self):
-        return []
+        return self.owner.db_stats.filter(stat__category=self.category)
 
     def load(self):
         for x in self.query():
@@ -428,6 +432,9 @@ class AttributeHandler(StatHandler):
     stat_classes = ATTRIBUTES
     category = "Attributes"
     stat_type = 'Attribute'
+    physical_attributes = ["Strength", "Dexterity", "Stamina"]
+    mental_attributes = ["Intelligence", "Wits", "Perception"]
+    social_attributes = ["Charisma", "Manipulation", "Appearance"]
 
     def get_caste_count(self):
         return self.owner.caste_attributes
@@ -440,6 +447,18 @@ class AttributeHandler(StatHandler):
 
     def get_caste(self):
         return self.owner.sub_attributes
+
+    def all_physical(self):
+        for x in self.physical_attributes:
+            yield self.data[x]
+
+    def all_mental(self):
+        for x in self.mental_attributes:
+            yield self.data[x]
+
+    def all_social(self):
+        for x in self.social_attributes:
+            yield self.data[x]
 
 
 EXISTS = {str(x) for x in [ATTRIBUTES + ABILITIES + ADVANTAGES + STYLES]}
@@ -485,4 +504,3 @@ class CraftHandler(CustomHandler):
     category = "Crafts"
     class_storage = dict()
     base_class = _Craft
-

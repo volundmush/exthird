@@ -9,6 +9,9 @@ class Stat(models.Model):
     class Meta:
         unique_together = (("category", "name"),)
 
+    def __str__(self):
+        return self.name
+
 
 class CharacterStat(models.Model):
     stat = models.ForeignKey(Stat, on_delete=models.PROTECT, related_name="users")
